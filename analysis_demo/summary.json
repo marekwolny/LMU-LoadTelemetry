@@ -1,0 +1,281 @@
+{
+  "generated_at": "2026-10-31T20:30:26",
+  "track": "Demo Raceway (SYNTHETIC)",
+  "session": "quali",
+  "track_length_m": 4000.0,
+  "inputs": [
+    "records_demo/20261031_113524_DemoRaceway_quali.csv.gz"
+  ],
+  "reference": "Demo_Aliens",
+  "drivers": [
+    {
+      "name": "Demo_Aliens",
+      "vehicle": "Demo Car",
+      "lap": 3,
+      "lap_time_s": 107.39999999999645,
+      "gap_s": 0.0,
+      "coverage": 0.9997729859402892,
+      "zones": 6,
+      "mean_brake_delta_m": 0.0,
+      "mean_pickup_delta_m": 0.0
+    },
+    {
+      "name": "Demo_Fast",
+      "vehicle": "Demo Car",
+      "lap": 3,
+      "lap_time_s": 108.26666666666307,
+      "gap_s": 0.8666666666666174,
+      "coverage": 0.9994240247794954,
+      "zones": 6,
+      "mean_brake_delta_m": -6.0,
+      "mean_pickup_delta_m": -6.0
+    },
+    {
+      "name": "Demo_Mid",
+      "vehicle": "Demo Car",
+      "lap": 3,
+      "lap_time_s": 109.49999999999636,
+      "gap_s": 2.099999999999909,
+      "coverage": 0.9998384903523014,
+      "zones": 6,
+      "mean_brake_delta_m": -18.0,
+      "mean_pickup_delta_m": -17.0
+    }
+  ],
+  "braking": [
+    {
+      "corner": "H1",
+      "ref_start": 0.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 0.0,
+          "delta_start": 0.0,
+          "brake_end": 352.0,
+          "pickup": 352.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 95.22206320990972,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 0.0,
+          "delta_start": 0.0,
+          "brake_end": 346.0,
+          "pickup": 346.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 93.80438630567161,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 0.0,
+          "delta_start": 0.0,
+          "brake_end": 334.0,
+          "pickup": 334.0,
+          "delta_pickup": -18.0,
+          "min_speed_kmh": 91.7202451395595,
+          "max_brake": 1.0
+        }
+      ]
+    },
+    {
+      "corner": "H2",
+      "ref_start": 720.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 720.0,
+          "delta_start": 0.0,
+          "brake_end": 902.0,
+          "pickup": 902.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 75.10663300491404,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 712.0,
+          "delta_start": -8.0,
+          "brake_end": 896.0,
+          "pickup": 896.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 73.88672809452883,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 702.0,
+          "delta_start": -18.0,
+          "brake_end": 884.0,
+          "pickup": 884.0,
+          "delta_pickup": -18.0,
+          "min_speed_kmh": 71.6517411935143,
+          "max_brake": 1.0
+        }
+      ]
+    },
+    {
+      "corner": "H3",
+      "ref_start": 1342.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 1342.0,
+          "delta_start": 0.0,
+          "brake_end": 1482.0,
+          "pickup": 1482.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 110.22185476365478,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 1334.0,
+          "delta_start": -8.0,
+          "brake_end": 1476.0,
+          "pickup": 1476.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 108.76240802042096,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 1322.0,
+          "delta_start": -20.0,
+          "brake_end": 1464.0,
+          "pickup": 1466.0,
+          "delta_pickup": -16.0,
+          "min_speed_kmh": 106.69277708695041,
+          "max_brake": 1.0
+        }
+      ]
+    },
+    {
+      "corner": "H4",
+      "ref_start": 1878.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 1878.0,
+          "delta_start": 0.0,
+          "brake_end": 2102.0,
+          "pickup": 2102.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 70.0956504109642,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 1872.0,
+          "delta_start": -6.0,
+          "brake_end": 2096.0,
+          "pickup": 2096.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 68.91490803116677,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 1862.0,
+          "delta_start": -16.0,
+          "brake_end": 2084.0,
+          "pickup": 2086.0,
+          "delta_pickup": -16.0,
+          "min_speed_kmh": 66.70969412709327,
+          "max_brake": 1.0
+        }
+      ]
+    },
+    {
+      "corner": "H5",
+      "ref_start": 2546.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 2546.0,
+          "delta_start": 0.0,
+          "brake_end": 2712.0,
+          "pickup": 2712.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 90.04346819342308,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 2538.0,
+          "delta_start": -8.0,
+          "brake_end": 2706.0,
+          "pickup": 2706.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 88.82153784081571,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 2528.0,
+          "delta_start": -18.0,
+          "brake_end": 2694.0,
+          "pickup": 2696.0,
+          "delta_pickup": -16.0,
+          "min_speed_kmh": 86.5853069955245,
+          "max_brake": 1.0
+        }
+      ]
+    },
+    {
+      "corner": "H6",
+      "ref_start": 3118.0,
+      "drivers": [
+        {
+          "name": "Demo_Aliens",
+          "matched": true,
+          "brake_start": 3118.0,
+          "delta_start": 0.0,
+          "brake_end": 3322.0,
+          "pickup": 3322.0,
+          "delta_pickup": 0.0,
+          "min_speed_kmh": 65.0677077803786,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Fast",
+          "matched": true,
+          "brake_start": 3112.0,
+          "delta_start": -6.0,
+          "brake_end": 3316.0,
+          "pickup": 3316.0,
+          "delta_pickup": -6.0,
+          "min_speed_kmh": 63.94726590956429,
+          "max_brake": 1.0
+        },
+        {
+          "name": "Demo_Mid",
+          "matched": true,
+          "brake_start": 3102.0,
+          "delta_start": -16.0,
+          "brake_end": 3304.0,
+          "pickup": 3304.0,
+          "delta_pickup": -18.0,
+          "min_speed_kmh": 61.633043795855485,
+          "max_brake": 1.0
+        }
+      ]
+    }
+  ]
+}

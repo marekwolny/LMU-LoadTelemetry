@@ -1,0 +1,38 @@
+{
+  "started_at": "2026-10-31T11:35:24",
+  "track": "Demo Raceway (SYNTHETIC)",
+  "track_length_m": 4000.0,
+  "session_id": 5,
+  "session": "quali",
+  "game_phase": 5,
+  "game_mode": 2,
+  "player": "Demo_Mid",
+  "server": "DEMO (synthetic data)",
+  "vehicles": [
+    {
+      "id": 1,
+      "driver": "Demo_Aliens",
+      "vehicle": "Demo Car",
+      "class": "GT3",
+      "is_player": false,
+      "control": 2
+    },
+    {
+      "id": 2,
+      "driver": "Demo_Fast",
+      "vehicle": "Demo Car",
+      "class": "GT3",
+      "is_player": false,
+      "control": 2
+    },
+    {
+      "id": 3,
+      "driver": "Demo_Mid",
+      "vehicle": "Demo Car",
+      "class": "GT3",
+      "is_player": true,
+      "control": 2
+    }
+  ],
+  "synthetic": true
+}

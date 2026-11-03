@@ -1,0 +1,20 @@
+# nagrania i wyniki
+records/
+analysis/
+tinypedal_laps/
+records_*/
+analysis_*/
+!records_demo/
+!analysis_demo/
+
+# python
+__pycache__/
+*.pyc
+
+# systemowe
+desktop.ini
+Thumbs.db
+
+# ustawienia aplikacji
+lmu_app_settings.json
+lmu_app_error.log

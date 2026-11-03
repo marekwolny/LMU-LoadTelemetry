@@ -1,0 +1,4 @@
+rank,driver,vehicle,lap,lap_time_s,gap_s,coverage,samples,lap_start_et
+1,Demo_Aliens,Demo Car,3,107.400,0.000,1.000,3223,279.805
+2,Demo_Fast,Demo Car,3,108.267,0.867,0.999,3249,279.805
+3,Demo_Mid,Demo Car,3,109.500,2.100,1.000,3286,279.805
