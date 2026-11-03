@@ -24,6 +24,8 @@ DRIVERS = [
     ("Demo_Fast", 249.0, 7.0, 0.96),
     ("Demo_Mid", 245.0, 18.0, 0.90),
 ]
+FUEL_START = 60.0
+FUEL_PER_LAP = {"Demo_Aliens": 2.95, "Demo_Fast": 2.85, "Demo_Mid": 2.70}   # L/okr. (syntetyczne)
 CORNERS = [(430, 95), (980, 75), (1560, 110), (2180, 70), (2790, 90), (3400, 65)]
 
 
@@ -163,6 +165,8 @@ def main(argv=None):
     with gzip.open(path, "wt", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(FIELDS)
+        # czasy okrazen i sektorow jak w scoringu gry (last_sector2 = S1+S2, narastajaco)
+        done = {name: {"best": 0.0, "last": 0.0, "s1": 0.0, "s2": 0.0} for name, _ in profiles}
         for lap in range(args.laps):
             lap_start = session_t
             resampled = []
@@ -175,6 +179,9 @@ def main(argv=None):
             # dopisz probki az do najdluzszego okrazenia
             for i, (name, samples) in enumerate(resampled):
                 last = samples[-1] if samples else (lap_start, 0.0, 0.0, 0.0, 0.0)
+                prev = done[name]
+                cut1 = next((s[0] for s in samples if s[1] >= TRACK_LEN / 3), lap_start) - lap_start
+                cut2 = next((s[0] for s in samples if s[1] >= TRACK_LEN * 2 / 3), lap_start) - lap_start
                 for (et, d, v, thr, brk) in samples:
                     x, z = track_point(d)
                     gear = max(1, min(6, 1 + int(v * 3.6 / 45)))
@@ -187,17 +194,22 @@ def main(argv=None):
                         "control": 2, "is_player": name == "Demo_Mid",
                         "lap": lap + 1, "lap_start_et": lap_start,
                         "lap_dist": d, "path_lateral": 0.0, "track_edge": 4.0,
-                        "best_lap": 0.0, "last_lap": 0.0,
+                        "best_lap": prev["best"], "last_lap": prev["last"],
+                        "best_sector1": prev["s1"], "best_sector2": prev["s2"],
+                        "last_sector1": prev["s1"], "last_sector2": prev["s2"],
                         "throttle": thr, "brake": brk, "steering": 0.0,
                         "gear": gear, "rpm": 4000 + v * 60,
                         "speed": v, "vel_z": -v, "x": x, "y": 0.0, "z": z,
-                        "fuel": 60.0, "in_pits": False, "sector": int(d / TRACK_LEN * 3),
+                        "fuel": FUEL_START - (lap + d / TRACK_LEN) * FUEL_PER_LAP[name],
+                        "in_pits": False, "sector": int(d / TRACK_LEN * 3),
                         "delta_best": 0.0, "virtual_energy": 1.0, "soc": 0.0,
                         "tc": 0, "abs": 0, "tc_active": False, "abs_active": False,
                         "lap_invalid": False,
                     }
                     w.writerow([row.get(k, "") for k in FIELDS])
                     rows += 1
+                t_lap = last[0] - lap_start
+                done[name] = {"best": t_lap, "last": t_lap, "s1": cut1, "s2": cut2}
             session_t += max_t + 0.4
             lap_no += 1
     print(f"demo: {path} ({rows} wierszy), meta: {meta_path}")

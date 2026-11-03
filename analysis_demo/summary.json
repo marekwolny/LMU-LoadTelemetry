@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-31T20:30:26",
+  "generated_at": "2026-11-03T08:47:41",
   "track": "Demo Raceway (SYNTHETIC)",
   "session": "quali",
   "track_length_m": 4000.0,
   "inputs": [
-    "records_demo/20261031_113524_DemoRaceway_quali.csv.gz"
+    "records_demo/20261103_084739_DemoRaceway_quali.csv.gz"
   ],
   "reference": "Demo_Aliens",
   "drivers": [
