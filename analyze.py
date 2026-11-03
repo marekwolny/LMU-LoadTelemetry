@@ -503,7 +503,7 @@ def braking_table(drivers, ref_name):
     ref_zones = ref["zones"]
     rows = []
     for zi, rz in enumerate(ref_zones, 1):
-        row = {"corner": f"H{zi}", "ref_start": rz["start_d"], "drivers": []}
+        row = {"corner": f"B{zi}", "ref_start": rz["start_d"], "drivers": []}
         for d in drivers:
             best = None
             best_delta = 1e9
@@ -563,35 +563,35 @@ def driver_summary(drivers, ref_name):
 
 # ------------------------------------------------------------------ main
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Analiza telemetrii LMU (wszystkie auta)")
-    ap.add_argument("inputs", nargs="+", help="pliki .csv.gz lub katalogi")
-    ap.add_argument("--out", default="analysis", help="katalog wynikow")
-    ap.add_argument("--top", type=int, default=6, help="ilu kierowcow analizowac (max 8)")
-    ap.add_argument("--grid", type=float, default=2.0, help="krok siatki dystansu [m]")
+    ap = argparse.ArgumentParser(description="LMU telemetry analysis (all cars)")
+    ap.add_argument("inputs", nargs="+", help=".csv.gz files or folders")
+    ap.add_argument("--out", default="analysis", help="output folder")
+    ap.add_argument("--top", type=int, default=6, help="how many drivers to analyse (max 8)")
+    ap.add_argument("--grid", type=float, default=2.0, help="distance grid step [m]")
     ap.add_argument("--min-coverage", type=float, default=0.97)
-    ap.add_argument("--ref", default=None, help="wymus nazwe kierowcy jako referencje")
+    ap.add_argument("--ref", default=None, help="force this driver as the reference")
     ap.add_argument("--no-html", action="store_true")
     ap.add_argument("--cls", default=None,
-                    help="tylko jedna klasa aut: nazwa klasy, 'mine' = klasa gracza, 'all' = wszystkie")
+                    help="one car class only: class name, 'mine' = player's class, 'all' = all classes")
     args = ap.parse_args(argv)
 
     paths = [p for p in expand_inputs(args.inputs) if os.path.exists(p)]
     if not paths:
-        print("Brak plikow wejsciowych.")
+        print("No input files.")
         return 2
     top_n = max(1, min(8, args.top))
     os.makedirs(args.out, exist_ok=True)
 
-    print(f"[ANALIZA] plikow: {len(paths)}")
+    print(f"[ANALYSIS] files: {len(paths)}")
     candidates, max_d, min_best = scan_laps(paths)
     covered = {(c["track"], c["session"], c["car_id"], c["driver"])
                for c in candidates}
     fb = scan_laps_by_number(paths, covered)
     if fb:
         candidates += fb
-        print(f"[ANALIZA] fallback po numerze okrazenia: +{len(fb)} okrazen")
+        print(f"[ANALYSIS] fallback by lap number: +{len(fb)} laps")
     if not candidates:
-        print("Nie znaleziono zadnych okrazen (brak lap_start_et / lap_dist w danych).")
+        print("No laps found (no lap_start_et / lap_dist in the data).")
         return 2
     key = pick_session(candidates, max_d)
     track, sess = key
@@ -604,7 +604,7 @@ def main(argv=None):
             break
     track_len = float(meta.get("track_length_m") or max_d[key] or 0.0)
     if track_len <= 0:
-        print("Nie znam dlugosci toru (brak metadanych).")
+        print("Unknown track length (no metadata).")
         return 2
     try:
         sess_label = SESSION_NAMES.get(int(sess), sess)
@@ -613,13 +613,13 @@ def main(argv=None):
     if meta.get("session"):
         sess_label = meta["session"]
     if len(set((c["track"], c["session"]) for c in candidates)) > 1:
-        print(f"[ANALIZA] uwaga: wiele sesji, analizuje najwieksza: {track} / {sess_label}")
+        print(f"[ANALYSIS] note: several sessions, analysing the largest: {track} / {sess_label}")
 
     laps, best_by_key = valid_laps(candidates, track_len, key, args.min_coverage,
                                     {k: v for k, v in min_best.items() if v < 1e8})
     if not best_by_key:
-        print("Brak kompletnych okrazen po filtrach (min_coverage / samples). "
-              "Sprobuj: --min-coverage 0.94")
+        print("No complete laps after filtering (min_coverage / samples). "
+              "Try: --min-coverage 0.94")
         return 2
 
     best_sorted = sorted(best_by_key.values(), key=lambda c: c["duration"])
@@ -636,9 +636,9 @@ def main(argv=None):
         only = [c for c in best_sorted if cmap.get(c["driver"]) == want] if want else []
         if only:
             best_sorted = only
-            print(f"[ANALIZA] tylko klasa {want}: {len(only)} kierowcow")
+            print(f"[ANALYSIS] class {want} only: {len(only)} drivers")
         else:
-            print(f"[ANALIZA] klasa {args.cls!r}: brak danych, biore wszystkie klasy")
+            print(f"[ANALYSIS] class {args.cls!r}: no data, using all classes")
     # kierowca = unikalna nazwa (jesli ten sam kierowca w 2 autach, rozdziel)
     seen = set()
     selected = []
@@ -669,7 +669,7 @@ def main(argv=None):
             target_laps[lap_key(c2["driver"], c2["car_id"], c2["lap"], c2["start"],
                                 c2.get("start_fallback", False))].append(c2)
     targets = set(target_laps.keys())
-    print(f"[ANALIZA] czytam przebiegi dla {len(selected)} kierowcow...")
+    print(f"[ANALYSIS] reading traces for {len(selected)} drivers...")
     edges = EdgeAcc()
     traces_raw = collect_traces(paths, targets, key, edges)
 
@@ -717,7 +717,7 @@ def main(argv=None):
             "zones": zones,
         })
     if not drivers:
-        print("Nie udalo sie zbudowac przebiegow (brak probek w okrazeniach).")
+        print("Could not build traces (no samples in the laps).")
         return 2
 
     drivers.sort(key=lambda d: d["lap_time"])
@@ -777,7 +777,7 @@ def main(argv=None):
 
     # --- CSV: granice toru (z wszystkich aut w nagraniu)
     if edges.write(os.path.join(args.out, "edges.csv"), track_len):
-        print("[ANALIZA] granice toru: edges.csv")
+        print("[ANALYSIS] track edges: edges.csv")
 
     # --- summary.json
     summary = {
@@ -836,20 +836,20 @@ def main(argv=None):
             page = tpl.replace("__DATA_JSON__",
                                json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
             page = page.replace("__PAGE_TITLE__",
-                                html_lib.escape(f"LMU telemetria — {track} / {sess_label}"))
+                                html_lib.escape(f"LMU telemetry — {track} / {sess_label}"))
             out_html = os.path.join(args.out, "report.html")
             open(out_html, "w", encoding="utf-8").write(page)
-            print(f"[ANALIZA] raport: {out_html}")
+            print(f"[ANALYSIS] report: {out_html}")
         else:
-            print(f"[ANALIZA] brak szablonu {tpl_path}, pomijam HTML")
+            print(f"[ANALYSIS] no template {tpl_path}, skipping HTML")
 
     # --- konsola
-    print(f"\n[ANALIZA] {track} / {sess_label} | dlugosc {track_len:.0f} m")
-    print(f"{'#':>2} {'kierowca':28} {'okr.':>4} {'czas':>9} {'strata':>8} {'pokrycie':>9}")
+    print(f"\n[ANALYSIS] {track} / {sess_label} | length {track_len:.0f} m")
+    print(f"{'#':>2} {'driver':28} {'lap':>4} {'time':>9} {'gap':>8} {'coverage':>9}")
     for i, d in enumerate(drivers, 1):
         print(f"{i:>2} {d['name'][:28]:28} {d['lap']:>4} {fmt_lap(d['lap_time']):>9} "
               f"{d['lap_time'] - drivers[0]['lap_time']:+8.3f} {d['coverage']*100:>8.1f}%")
-    print(f"\n[ANALIZA] zapisano: {laps_path}, {brk_path}, {tr_path}, summary.json")
+    print(f"\n[ANALYSIS] saved: {laps_path}, {brk_path}, {tr_path}, summary.json")
     return 0
 
 

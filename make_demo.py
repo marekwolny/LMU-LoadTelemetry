@@ -25,7 +25,7 @@ DRIVERS = [
     ("Demo_Mid", 245.0, 18.0, 0.90),
 ]
 FUEL_START = 60.0
-FUEL_PER_LAP = {"Demo_Aliens": 2.95, "Demo_Fast": 2.85, "Demo_Mid": 2.70}   # L/okr. (syntetyczne)
+FUEL_PER_LAP = {"Demo_Aliens": 2.95, "Demo_Fast": 2.85, "Demo_Mid": 2.70}   # L/lap (synthetic)
 CORNERS = [(430, 95), (980, 75), (1560, 110), (2180, 70), (2790, 90), (3400, 65)]
 
 
@@ -165,7 +165,7 @@ def main(argv=None):
     with gzip.open(path, "wt", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh, lineterminator="\n")
         w.writerow(FIELDS)
-        # czasy okrazen i sektorow jak w scoringu gry (last_sector2 = S1+S2, narastajaco)
+        # lap and sector times as in game scoring (last_sector2 = S1+S2, cumulative)
         done = {name: {"best": 0.0, "last": 0.0, "s1": 0.0, "s2": 0.0} for name, _ in profiles}
         for lap in range(args.laps):
             lap_start = session_t
@@ -212,8 +212,8 @@ def main(argv=None):
                 done[name] = {"best": t_lap, "last": t_lap, "s1": cut1, "s2": cut2}
             session_t += max_t + 0.4
             lap_no += 1
-    print(f"demo: {path} ({rows} wierszy), meta: {meta_path}")
-    print("UWAGA: dane syntetyczne, nie z LMU.")
+    print(f"demo: {path} ({rows} rows), meta: {meta_path}")
+    print("NOTE: synthetic data, not from LMU.")
     return 0
 
 

@@ -14,7 +14,7 @@ import math
 import statistics
 from pathlib import Path
 
-VERSION = 2
+VERSION = 3
 
 
 def _f(x):
@@ -82,7 +82,7 @@ def scan(path: Path, player: str | None) -> dict:
                 laps[-1:] and laps[-1].update(kind="in") if laps and laps[-1]["lap"] == lap else None
             if stint and stint["laps"] and not stint.get("closed"):
                 stint["closed"] = True
-                stint["end"] = stint.get("end") or "zjazd do boksu"
+                stint["end"] = stint.get("end") or "pitted"
             prev = row
             continue
         # poza boksem
@@ -99,7 +99,7 @@ def scan(path: Path, player: str | None) -> dict:
                    "flast": fuel, "elast": ve}
         cur["flast"], cur["elast"] = fuel, ve
         if fuel is not None and fuel <= 0.05 and stint.get("end") is None:
-            stint["end"] = f"brak paliwa na okr. {lap} ({dist or 0:.0f} m)"
+            stint["end"] = f"out of fuel on lap {lap} ({dist or 0:.0f} m)"
             stint["empty_lap"] = lap
         prev = row
     if cur is not None:
@@ -145,7 +145,7 @@ def rates(laps: list[dict], key="fuel") -> dict:
     if times:
         best = min(times)
         fly = [l for l in fly if not l.get("time") or l["time"] <= best * 1.07]
-    # energia wirtualna jest ulamkiem 0..1 (3-8 % na okr. = 0.03-0.08) - prog 0.05 jest tylko dla litrow
+    # virtual energy is a 0..1 fraction (3-8 % per lap = 0.03-0.08); the 0.05 threshold is for litres only
     vals = [l[key] for l in fly if l[key] > (0.05 if key == "fuel" else 0.0005)]
     out = [l[key] for l in laps if l["kind"] == "out" and l.get(key) and not l.get("race")]
     form = [l[key] for l in laps if l["kind"] == "out" and l.get(key) and l.get("race")]
@@ -170,20 +170,20 @@ def plan(per_lap, mode, laps=0, minutes=0.0, lap_time=None, out_lap=None, in_lap
     if not per_lap:
         return None, parts
     if mode == "quali":
-        parts.append((f"okrążenie wyjazdowe", out_lap if out_lap else per_lap))
-        parts.append((f"{laps} × okrążenie pomiarowe", laps * per_lap))
+        parts.append(("out lap", out_lap if out_lap else per_lap))
+        parts.append((f"{laps} × timed lap", laps * per_lap))
         if in_lap:
-            parts.append(("okrążenie zjazdowe", in_lap_rate if in_lap_rate else per_lap * 0.8))
+            parts.append(("in lap", in_lap_rate if in_lap_rate else per_lap * 0.8))
     else:
         if mode == "race_time":
             # po uplywie czasu konczysz okrazenie, na ktorym jestes
             n = math.floor(minutes * 60 / lap_time) + 1 if lap_time else 0
-            parts.append((f"wyścig {minutes:g} min ≈ {n} okr. (z okrążeniem, na którym kończy się czas)",
+            parts.append((f"race {minutes:g} min ≈ {n} laps (incl. the lap on which time runs out)",
                           n * per_lap))
         else:
-            parts.append((f"wyścig {laps} okr.", laps * per_lap))
+            parts.append((f"race {laps} laps", laps * per_lap))
         if formation:
-            parts.append(("okrążenie formujące", formation_rate if formation_rate else per_lap * 0.5))
+            parts.append(("formation lap", formation_rate if formation_rate else per_lap * 0.5))
     if margin_laps:
-        parts.append((f"zapas {margin_laps:g} okr.", margin_laps * per_lap))
+        parts.append((f"margin {margin_laps:g} laps", margin_laps * per_lap))
     return sum(v for _, v in parts), parts

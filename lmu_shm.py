@@ -475,8 +475,8 @@ class LmuSharedMemory:
             self._mm = mmap.mmap(-1, SIZE, tagname=LMU_SHARED_MEMORY_FILE)
         except (OSError, ValueError) as e:
             raise SharedMemoryError(
-                f"Nie moge otworzyc '{LMU_SHARED_MEMORY_FILE}' ({e}). "
-                "Czy LMU dziala z wlaczonymi pluginami?") from e
+                f"Cannot open '{LMU_SHARED_MEMORY_FILE}' ({e}). "
+                "Is LMU running with plugins enabled?") from e
 
         # SYNCHRONIZE = 0x00100000
         self._hold = self._k32.OpenEventA(0x00100000, False, LMU_HOLD_EVENT.encode())
@@ -529,7 +529,7 @@ class LmuSharedMemory:
 
     def snapshot(self) -> SharedMemoryObjectOut:
         if not self._mm:
-            raise SharedMemoryError("Nie otwarto LMU_Data")
+            raise SharedMemoryError("LMU_Data is not open")
         raw = self._mm[:SIZE]
         for _ in range(5):
             raw2 = self._mm[:SIZE]

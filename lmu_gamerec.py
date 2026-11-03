@@ -326,9 +326,9 @@ class Source:
             g = self.con.execute('SELECT value FROM "GPS Time" ORDER BY rowid').fetchall()
             self.gps = [r[0] for r in g if r[0] is not None]
             if len(self.gps) < 10:
-                raise ValueError("pusty plik (brak GPS Time)")
+                raise ValueError("empty file (no GPS Time)")
         except Exception:
-            # bez tego plik .duckdb zostaje otwarty (na Windows zablokowany dla gry)
+            # otherwise the .duckdb file stays open (locked for the game on Windows)
             self.con.close()
             raise
 
@@ -416,7 +416,7 @@ def setup_svm(meta: dict) -> str | None:
     except ValueError:
         return None
     lines = [f'VehicleClassSetting="{meta.get("CarClass", "")}"', "UpgradeSetting=(0,0,0,0)",
-             "// z wbudowanej telemetrii LMU (import LMU Telemetry)", ""]
+             "// from LMU built-in telemetry (LMU Telemetry import)", ""]
     for section, mapping in SVM_MAPPING.items():
         lines.append(f"[{section}]")
         for key, src in mapping:
@@ -584,7 +584,7 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
         t0, t1 = g[0], g[-1]
         speed = src.sampled("Ground Speed") or src.sampled("GPS Speed")
         if not speed:
-            raise ValueError("brak kanalu predkosci")
+            raise ValueError("no speed channel")
         kmh = max(v for v in speed[1] if v is not None) > 150
         ch = {
             "speed": Lin(speed), "thr": Lin(src.sampled("Throttle Pos")),
@@ -601,7 +601,7 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
                                                 "Last Sector1", "Last Sector2", "Best Sector1",
                                                 "Best Sector2", "Current Sector", "TC", "ABS")}
         if not any((v or 0) > 0 for _, v in src.events("Lap Time")):
-            raise ValueError("brak pełnego okrążenia (sam wyjazd z boksu)")
+            raise ValueError("no complete lap (pit exit only)")
         laps = src.events("Lap")
         lap_starts = [t for t, _ in laps] or [t0]
         lap_nums = [int(v) if isinstance(v, (int, float)) else i for i, (_, v) in enumerate(laps)] or [0]
@@ -610,7 +610,7 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
         track, track_len = _match_track(meta.get("TrackLayout") or meta.get("TrackName", "?"),
                                         track_len, records)
         session = _session_name(meta, path)
-        driver = meta.get("DriverName") or player or "Ja"
+        driver = meta.get("DriverName") or player or "Me"
         vehicle = meta.get("CarName", "")
         cls = meta.get("CarClass", "")
         # dystans okrazenia: kanal gry (10 Hz) + calka predkosci miedzy probkami i przy przejsciu linii
@@ -649,7 +649,7 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
                 d = v * (t - ls)
             rows.append([t, v, x, z, lap, ls, d, 1 if ev["In Pits"](t) else 0])
         if not rows:
-            raise ValueError("brak pozycji GPS")
+            raise ValueError("no GPS position")
         # dopasowanie GPS do ukladu wspolrzednych gry (jesli jest wczesniejsze nagranie toru)
         ref = _reference_line(analysis_dir, track)
         if ref:
@@ -674,11 +674,11 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
                 if err < 25:
                     for r in rows:
                         r[2], r[3] = f(r[2], r[3])
-                    log(f"[GRA] pozycje dopasowane do układu gry (średni błąd {err:.1f} m)")
+                    log(f"[GAME] positions fitted to the game coordinates (mean error {err:.1f} m)")
         # zapis
         start = parse_name(path)[2] or datetime.fromtimestamp(path.stat().st_mtime - (t1 - t0))
         safe = re.sub(r"[^A-Za-z0-9_-]+", "_", track).strip("_")
-        stem = f"{start:%Y%m%d_%H%M%S}_{safe}_{session}_gra"
+        stem = f"{start:%Y%m%d_%H%M%S}_{safe}_{session}_game"
         out_csv = Path(records) / f"{stem}.csv.gz"
         with gzip.open(out_csv, "wt", encoding="utf-8", newline="") as fh:
             w = csv.writer(fh, lineterminator="\n")
@@ -723,7 +723,7 @@ def import_file(path: Path, records: Path, analysis_dir: Path, player: str | Non
                              "name": lmu_setup.describe(ps), "from_game": True}]
         (Path(records) / f"{stem}.metadata.json").write_text(
             json.dumps(md, ensure_ascii=False, indent=2), encoding="utf-8")
-        log(f"[GRA] {path.name} -> {stem} ({len(rows)} próbek, {len(set(r[4] for r in rows))} okr.)")
+        log(f"[GAME] {path.name} -> {stem} ({len(rows)} samples, {len(set(r[4] for r in rows))} laps)")
         return stem
     finally:
         src.close()
@@ -747,7 +747,7 @@ def import_all(records: Path, analysis_dir: Path, player: str | None, log=print)
         cov = covered_by(p, Path(records))
         if cov:
             # ta sama sesja jest juz nagrana aplikacja (z rywalami i podwoziem) - bez duplikatu
-            log(f"[GRA] {p.name}: pominięty — ta sesja jest już nagrana aplikacją ({cov})")
+            log(f"[GAME] {p.name}: skipped — this session is already recorded by the app ({cov})")
             reg[p.name] = {"size": p.stat().st_size, "covered": cov}
             _write_reg(reg_path, reg)
             continue
@@ -756,7 +756,7 @@ def import_all(records: Path, analysis_dir: Path, player: str | None, log=print)
             reg[p.name] = {"size": p.stat().st_size, "stem": stem}
             done.append(stem)
         except Exception as e:
-            log(f"[GRA] {p.name}: pominięty — {type(e).__name__}: {e}")
+            log(f"[GAME] {p.name}: skipped — {type(e).__name__}: {e}")
             reg[p.name] = {"size": p.stat().st_size, "skip": True, "error": str(e)}
         _write_reg(reg_path, reg)
     return done

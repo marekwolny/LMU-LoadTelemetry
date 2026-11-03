@@ -16,42 +16,42 @@ _player_dir = None
 _lib_cache: dict = {}
 
 SECTION_NAMES = {
-    "GENERAL": "Ogólne", "FRONTWING": "Aero", "REARWING": "Aero", "BODYAERO": "Aero / chłodzenie",
-    "SUSPENSION": "Zawieszenie", "CONTROLS": "Hamulce i elektronika", "ENGINE": "Silnik",
-    "DRIVELINE": "Skrzynia i dyferencjał", "LEFTFENDER": "Aero", "RIGHTFENDER": "Aero",
+    "GENERAL": "General", "FRONTWING": "Aero", "REARWING": "Aero", "BODYAERO": "Aero / cooling",
+    "SUSPENSION": "Suspension", "CONTROLS": "Brakes and electronics", "ENGINE": "Engine",
+    "DRIVELINE": "Gearbox and differential", "LEFTFENDER": "Aero", "RIGHTFENDER": "Aero",
 }
 WHEELS = ("FRONTLEFT", "FRONTRIGHT", "REARLEFT", "REARRIGHT")
 LABELS = {
-    "FuelSetting": "Paliwo (mnożnik)", "VirtualEnergySetting": "Energia wirtualna",
-    "NumPitstopsSetting": "Liczba pit stopów", "FWSetting": "Przednie skrzydło",
-    "RWSetting": "Tylne skrzydło", "WaterRadiatorSetting": "Chłodnica wody",
-    "OilRadiatorSetting": "Chłodnica oleju", "BrakeDuctSetting": "Wlot hamulców przód",
-    "BrakeDuctRearSetting": "Wlot hamulców tył", "FrontAntiSwaySetting": "Stabilizator przód",
-    "RearAntiSwaySetting": "Stabilizator tył", "FrontToeInSetting": "Zbieżność przód",
-    "RearToeInSetting": "Zbieżność tył", "Front3rdSpringSetting": "3. sprężyna przód",
-    "Rear3rdSpringSetting": "3. sprężyna tył", "Front3rdPackerSetting": "3. odbojnik przód",
-    "Rear3rdPackerSetting": "3. odbojnik tył", "SteerLockSetting": "Skręt kierownicy",
-    "RearBrakeSetting": "Balans hamulców (P:T)", "BrakeMigrationSetting": "Migracja hamulców",
-    "BrakePressureSetting": "Ciśnienie hamulców", "ABSSetting": "ABS (dostępność)",
-    "TractionControlMapSetting": "TC mapa", "TCPowerCutMapSetting": "TC cut",
-    "TCSlipAngleMapSetting": "TC slip", "AntilockBrakeSystemMapSetting": "Mapa ABS",
-    "RevLimitSetting": "Ogranicznik obrotów", "EngineMixtureSetting": "Mapa silnika",
-    "RegenerationMapSetting": "Rekuperacja", "ElectricMotorMapSetting": "Mapa silnika el.",
-    "EngineBrakingMapSetting": "Hamowanie silnikiem", "FinalDriveSetting": "Przełożenie główne",
-    "RatioSetSetting": "Zestaw przełożeń", "DiffPreloadSetting": "Dyferencjał: preload",
-    "DiffPowerSetting": "Dyferencjał: gaz", "DiffCoastSetting": "Dyferencjał: hamowanie",
-    "DiffPumpSetting": "Dyferencjał: pompa", "RearSplitSetting": "Rozdział napędu",
-    "CamberSetting": "Pochylenie (camber)", "PressureSetting": "Ciśnienie opon",
-    "PackerSetting": "Odbojnik", "SpringSetting": "Sprężyna", "RideHeightSetting": "Prześwit",
-    "SlowBumpSetting": "Dobicie wolne", "FastBumpSetting": "Dobicie szybkie",
-    "SlowReboundSetting": "Odbicie wolne", "FastReboundSetting": "Odbicie szybkie",
-    "BrakeDiscSetting": "Tarcza hamulcowa", "BrakePadSetting": "Klocki",
-    "CompoundSetting": "Mieszanka opon", "TenderSpringSetting": "Sprężyna pomocnicza",
-    "TenderTravelSetting": "Skok spr. pomocniczej", "TractionControlSetting": "TC (dostępność)",
-    "FuelCapacitySetting": "Pojemność baku", "ReverseSetting": "Wsteczny",
-    "GearAutoUpShiftSetting": "Auto zmiana w górę", "GearAutoDownShiftSetting": "Auto zmiana w dół",
+    "FuelSetting": "Fuel (multiplier)", "VirtualEnergySetting": "Virtual energy",
+    "NumPitstopsSetting": "Number of pit stops", "FWSetting": "Front wing",
+    "RWSetting": "Rear wing", "WaterRadiatorSetting": "Water radiator",
+    "OilRadiatorSetting": "Oil radiator", "BrakeDuctSetting": "Front brake duct",
+    "BrakeDuctRearSetting": "Rear brake duct", "FrontAntiSwaySetting": "Front anti-roll bar",
+    "RearAntiSwaySetting": "Rear anti-roll bar", "FrontToeInSetting": "Front toe",
+    "RearToeInSetting": "Rear toe", "Front3rdSpringSetting": "Front 3rd spring",
+    "Rear3rdSpringSetting": "Rear 3rd spring", "Front3rdPackerSetting": "Front 3rd packer",
+    "Rear3rdPackerSetting": "Rear 3rd packer", "SteerLockSetting": "Steering lock",
+    "RearBrakeSetting": "Brake bias (F:R)", "BrakeMigrationSetting": "Brake migration",
+    "BrakePressureSetting": "Brake pressure", "ABSSetting": "ABS (available)",
+    "TractionControlMapSetting": "TC map", "TCPowerCutMapSetting": "TC cut",
+    "TCSlipAngleMapSetting": "TC slip", "AntilockBrakeSystemMapSetting": "ABS map",
+    "RevLimitSetting": "Rev limiter", "EngineMixtureSetting": "Engine map",
+    "RegenerationMapSetting": "Regen", "ElectricMotorMapSetting": "Electric motor map",
+    "EngineBrakingMapSetting": "Engine braking", "FinalDriveSetting": "Final drive",
+    "RatioSetSetting": "Gear ratio set", "DiffPreloadSetting": "Diff: preload",
+    "DiffPowerSetting": "Diff: power", "DiffCoastSetting": "Diff: coast",
+    "DiffPumpSetting": "Diff: pump", "RearSplitSetting": "Torque split",
+    "CamberSetting": "Camber", "PressureSetting": "Tyre pressure",
+    "PackerSetting": "Packer", "SpringSetting": "Spring", "RideHeightSetting": "Ride height",
+    "SlowBumpSetting": "Slow bump", "FastBumpSetting": "Fast bump",
+    "SlowReboundSetting": "Slow rebound", "FastReboundSetting": "Fast rebound",
+    "BrakeDiscSetting": "Brake disc", "BrakePadSetting": "Brake pads",
+    "CompoundSetting": "Tyre compound", "TenderSpringSetting": "Tender spring",
+    "TenderTravelSetting": "Tender spring travel", "TractionControlSetting": "TC (available)",
+    "FuelCapacitySetting": "Fuel capacity", "ReverseSetting": "Reverse",
+    "GearAutoUpShiftSetting": "Auto upshift", "GearAutoDownShiftSetting": "Auto downshift",
 }
-LABELS.update({f"Gear{i}Setting": f"Bieg {i}" for i in range(1, 9)})
+LABELS.update({f"Gear{i}Setting": f"Gear {i}" for i in range(1, 9)})
 HIDDEN = {"N/A", "Non-adjustable", "", "Fixed", "Detached"}
 SKIP = {"Symmetric"}
 
@@ -177,8 +177,8 @@ def identify(parsed: dict) -> tuple[str, int, str]:
 def describe(parsed: dict) -> str:
     name, n, _ = identify(parsed)
     if not name:
-        return "własny (nie zapisany)"
-    return name if n == 0 else f"{name} + {n} zmian"
+        return "custom (not saved)"
+    return name if n == 0 else f"{name} + {n} changes"
 
 
 def track_folder(track: str) -> Path | None:
@@ -238,7 +238,7 @@ def rows(parsed: dict, other: dict | None = None):
                 if all(x in HIDDEN or x == "Standard" for x in vals):
                     continue
                 ovals = [ov.get(f"{s}.{k}", "") for s in WHEELS] if other else None
-                out.append(("Koła", label(k), _wheels(vals),
+                out.append(("Wheels", label(k), _wheels(vals),
                             _wheels(ovals) if ovals else "", bool(other) and vals != ovals))
             continue
         for k, disp in items:
@@ -254,7 +254,7 @@ def _wheels(vals):
     fl, fr, rl, rr = vals
     f = fl if fl == fr else f"{fl} | {fr}"
     r = rl if rl == rr else f"{rl} | {rr}"
-    return f"P: {f}   ·   T: {r}"
+    return f"F: {f}   ·   R: {r}"
 
 
 def setup_for_lap(setups: list[dict], lap_start_et) -> dict | None:
@@ -315,17 +315,17 @@ def with_fuel(text: str, liters: float | None = None, ve_pct: float | None = Non
     kind = fuel_kind(text)
     if kind == "ve":
         if ve_pct is None:
-            return None, "to auto tankuje energię wirtualną [%], a brak danych zużycia energii"
+            return None, "this car is fuelled with virtual energy [%], but there is no energy usage data"
         pct = max(1, min(100, int(-(-ve_pct // 1))))
         new = _RE_VE.sub(lambda m: f"{m.group(1)}={pct}//{pct}%", text, count=1)
-        return new, f"energia wirtualna {pct}%"
+        return new, f"virtual energy {pct}%"
     if kind == "liters":
         if liters is None:
-            return None, "brak danych zużycia paliwa"
+            return None, "no fuel usage data"
         veh = parse(text)["vehicle"]
         a, b = fuel_mapping(veh)
         idx = max(0, int(-(-(liters - b) // a)))
         val = a * idx + b
         new = _RE_FUEL.sub(lambda m: f"{m.group(1)}={idx}//{val:.1f}L", text, count=1)
-        return new, f"paliwo {val:.1f} L"
-    return None, "w tym setupie nie znalazłem ustawienia paliwa"
+        return new, f"fuel {val:.1f} L"
+    return None, "no fuel setting found in this setup"

@@ -86,7 +86,6 @@
   }
   .card h3 { margin: 0 0 6px; font-size: 17px; }
   .card p { margin: 0; color: var(--muted); font-size: 15px; }
-  .card .pl { color: var(--muted); font-weight: 500; font-size: 13px; }
   .gallery { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
   figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
   figure a { display: block; }
@@ -141,7 +140,7 @@
       <a href="screenshots/charts-map.png"><img src="screenshots/charts-map.png" width="1600" height="1000"
         alt="LMU LoadTelemetry main window: session library on the left, time delta, speed, throttle, brake and gear charts by distance, and a track map coloured by gain and loss"></a>
     </div>
-    <p class="note">All screenshots use the bundled synthetic demo session, not real player data. The app UI is in Polish.</p>
+    <p class="note">All screenshots use the bundled synthetic demo session, not real player data.</p>
   </div>
 
   <section id="features">
@@ -150,9 +149,9 @@
     <div class="grid">
       <div class="card"><h3>Records the whole field</h3><p>Throttle, brake, steering, gear, speed and position of all cars in the session, live or from an in-game replay.</p></div>
       <div class="card"><h3>Lap and corner comparison</h3><p>Time delta by distance, per-segment gain/loss, braking zones and a dark corner view with both racing lines.</p></div>
-      <div class="card"><h3>Classes and cars <span class="pl">· Klasy i auta</span></h3><p>Best laps per class, gap to the class leader, sector times and your ideal lap.</p></div>
-      <div class="card"><h3>Fuel calculator <span class="pl">· Paliwo</span></h3><p>Real consumption per lap from your recordings; fuel for qualifying, timed or lap races, and a setup saved with that fuel.</p></div>
-      <div class="card"><h3>Training plan <span class="pl">· Plan treningu</span></h3><p>The corners where you lose the most, why (braking, coasting, apex speed, line) and what to try next.</p></div>
+      <div class="card"><h3>Classes and cars</h3><p>Best laps per class, gap to the class leader, sector times and your ideal lap.</p></div>
+      <div class="card"><h3>Fuel calculator</h3><p>Real consumption per lap from your recordings; fuel for qualifying, timed or lap races, and a setup saved with that fuel.</p></div>
+      <div class="card"><h3>Training plan</h3><p>The corners where you lose the most, why (braking, coasting, apex speed, line) and what to try next.</p></div>
       <div class="card"><h3>Setup and handling</h3><p>Setup snapshots per lap and comparisons; understeer/oversteer, load transfer, tyres and ride height per corner phase.</p></div>
       <div class="card"><h3>Voice engineer for VR</h3><p>Lap time, gap to your best and fuel laps read out after every lap, plus a VR panel for OpenKneeboard.</p></div>
       <div class="card"><h3>Game telemetry import</h3><p>Converts LMU's built-in DuckDB telemetry into recordings, so sessions you didn't record still show up.</p></div>
@@ -165,7 +164,7 @@
     <div class="gallery">
       <figure>
         <a href="screenshots/charts-map.png"><img src="screenshots/charts-map.png" loading="lazy" width="1600" height="1000" alt="Charts and track map tab comparing two drivers over a full lap"></a>
-        <figcaption><b>Charts and map</b> (Wykresy i mapa): time delta, speed, pedals, gear and line by distance; the map shows where you gain (green) or lose (red).</figcaption>
+        <figcaption><b>Charts &amp; map:</b> time delta, speed, pedals, gear and line by distance; the map shows where you gain (green) or lose (red).</figcaption>
       </figure>
       <figure>
         <a href="screenshots/line-comparison.png"><img src="screenshots/line-comparison.png" loading="lazy" width="1600" height="1000" alt="Zoomed corner with a dark map comparing the racing lines of two drivers"></a>
@@ -173,15 +172,15 @@
       </figure>
       <figure>
         <a href="screenshots/classes-cars.png"><img src="screenshots/classes-cars.png" loading="lazy" width="1600" height="1000" alt="Classes and cars table with best laps, gaps and sector times"></a>
-        <figcaption><b>Classes and cars</b> (Klasy i auta): best laps per class, gaps, sectors and ideal laps.</figcaption>
+        <figcaption><b>Classes &amp; cars:</b> best laps per class, gaps, sectors and ideal laps.</figcaption>
       </figure>
       <figure>
         <a href="screenshots/fuel-calculator.png"><img src="screenshots/fuel-calculator.png" loading="lazy" width="1600" height="1000" alt="Fuel calculator with per-lap fuel use from the recording"></a>
-        <figcaption><b>Fuel</b> (Paliwo): consumption per lap and stint, and how much to fuel for qualifying or a race.</figcaption>
+        <figcaption><b>Fuel:</b> consumption per lap and stint, and how much to fuel for qualifying or a race.</figcaption>
       </figure>
       <figure>
         <a href="screenshots/training-plan.png"><img src="screenshots/training-plan.png" loading="lazy" width="1600" height="1000" alt="Training plan listing the corners with the biggest time loss and tips"></a>
-        <figcaption><b>Training plan</b> (Plan treningu): biggest losses, their causes and concrete tips.</figcaption>
+        <figcaption><b>Training plan:</b> biggest losses, their causes and concrete tips.</figcaption>
       </figure>
       <figure>
         <a href="screenshots/html-report.png"><img src="screenshots/html-report.png" loading="lazy" width="1600" height="1000" alt="Interactive HTML report with lap summary and brake trace"></a>
@@ -206,7 +205,7 @@ cd LMU-LoadTelemetry</code></pre>
       </div>
       <div class="card">
         <h3>4. Record a session</h3>
-        <p>Get on track (or play a replay at 1×) and press <b>● Nagrywaj</b> (record) or <b>F9</b>.
+        <p>Get on track (or play a replay at 1×) and press <b>● Record</b> or <b>F9</b>.
           Press it again to stop; the session is analysed and opens on the right.</p>
         <h3 style="margin-top:16px">Command line, if you prefer</h3>
         <pre><code>python record.py --probe-seconds 10

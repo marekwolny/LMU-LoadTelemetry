@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pl">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -143,106 +143,106 @@ footer code{background:color-mix(in srgb,var(--surface-1) 70%,var(--text-primary
 <main class="viz-root">
   <div class="top">
     <div>
-      <p class="eyebrow">Le Mans Ultimate · telemetria</p>
+      <p class="eyebrow">Le Mans Ultimate · telemetry</p>
       <h1 id="pageTitle">__PAGE_TITLE__</h1>
       <p class="sub" id="subtitle"></p>
     </div>
-    <button class="btn" id="themeBtn" type="button" aria-pressed="false">Ciemny motyw</button>
+    <button class="btn" id="themeBtn" type="button" aria-pressed="false">Dark theme</button>
   </div>
 
   <div id="syntheticBanner" class="banner" hidden>
     <span class="ico" aria-hidden="true">⚠</span>
-    <span>DANE SYNTETYCZNE — to tylko test pipeline'u, nie telemetria z LMU.</span>
+    <span>SYNTHETIC DATA — this is only a pipeline test, not LMU telemetry.</span>
   </div>
 
-  <section class="stats" aria-label="Podsumowanie">
+  <section class="stats" aria-label="Summary">
     <div class="stat">
-      <span class="stat-label">Najszybsze okrążenie</span>
+      <span class="stat-label">Fastest lap</span>
       <span class="stat-value" id="fastestLap">—</span>
       <span class="stat-sub" id="fastestDriver">—</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Strata drugiego</span>
+      <span class="stat-label">Gap of P2</span>
       <span class="stat-value" id="gapP2">—</span>
       <span class="stat-sub" id="gapP2Name">—</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Kierowcy</span>
+      <span class="stat-label">Drivers</span>
       <span class="stat-value" id="driverCount">—</span>
-      <span class="stat-sub">w analizie</span>
+      <span class="stat-sub">in the analysis</span>
     </div>
     <div class="stat">
-      <span class="stat-label">Długość toru</span>
+      <span class="stat-label">Track length</span>
       <span class="stat-value" id="trackLen">—</span>
       <span class="stat-sub" id="sessionInfo">—</span>
     </div>
   </section>
 
-  <section class="card" aria-label="Filtry kierowców">
+  <section class="card" aria-label="Driver filters">
     <div class="legend" id="driverLegend"></div>
     <div class="legend-actions">
-      <button class="btn" type="button" id="allBtn">Wszyscy</button>
-      <button class="btn" type="button" id="refBtn">Tylko referencja</button>
+      <button class="btn" type="button" id="allBtn">Everyone</button>
+      <button class="btn" type="button" id="refBtn">Reference only</button>
     </div>
     <div class="focus-row">
-      <label for="focusSelect">Kierowca:</label>
+      <label for="focusSelect">Driver:</label>
       <select id="focusSelect"></select>
-      <button class="btn" type="button" id="zoomOut" aria-label="Oddal">−</button>
-      <button class="btn" type="button" id="zoomIn" aria-label="Przybliż">+</button>
+      <button class="btn" type="button" id="zoomOut" aria-label="Zoom out">−</button>
+      <button class="btn" type="button" id="zoomIn" aria-label="Zoom in">+</button>
       <button class="btn" type="button" id="zoomReset">Reset zoom</button>
-      <span class="zoom-info" id="zoomInfo">cały tor</span>
+      <span class="zoom-info" id="zoomInfo">whole track</span>
     </div>
-    <p class="hint">Przeciągnij po wykresie, aby przybliżyć zakres; dwuklik lub „Reset zoom” przywraca cały tor. „Kierowca” pokazuje jedną osobę, checkboxy pozwalają porównywać wiele.</p>
+    <p class="hint">Drag over a chart to zoom into a range; double-click or “Reset zoom” returns to the whole track. “Driver” shows one person, the checkboxes let you compare several.</p>
   </section>
 
   <section class="card chart-card">
-    <h2>Hamulec</h2>
-    <p class="hint">Naciśnięcie pedału hamulca (0–1) w funkcji dystansu [m]. Kolor = kierowca; najedź kursorem, aby porównać.</p>
-    <div class="chart-wrap"><canvas id="brakeChart" role="img" aria-label="Wykres hamulca w funkcji dystansu"></canvas><div class="tip" id="brakeTip"></div></div>
+    <h2>Brake</h2>
+    <p class="hint">Brake pedal (0–1) by distance [m]. Colour = driver; hover to compare.</p>
+    <div class="chart-wrap"><canvas id="brakeChart" role="img" aria-label="Brake by distance chart"></canvas><div class="tip" id="brakeTip"></div></div>
   </section>
 
   <section class="card chart-card">
-    <h2>Gaz</h2>
-    <p class="hint">Naciśnięcie pedału gazu (0–1) w funkcji dystansu [m].</p>
-    <div class="chart-wrap"><canvas id="throttleChart" role="img" aria-label="Wykres gazu w funkcji dystansu"></canvas><div class="tip" id="throttleTip"></div></div>
+    <h2>Throttle</h2>
+    <p class="hint">Throttle pedal (0–1) by distance [m].</p>
+    <div class="chart-wrap"><canvas id="throttleChart" role="img" aria-label="Throttle by distance chart"></canvas><div class="tip" id="throttleTip"></div></div>
   </section>
 
   <section class="card chart-card">
-    <h2>Prędkość</h2>
-    <p class="hint">Prędkość [km/h] w funkcji dystansu [m].</p>
-    <div class="chart-wrap"><canvas id="speedChart" role="img" aria-label="Wykres prędkości w funkcji dystansu"></canvas><div class="tip" id="speedTip"></div></div>
+    <h2>Speed</h2>
+    <p class="hint">Speed [km/h] by distance [m].</p>
+    <div class="chart-wrap"><canvas id="speedChart" role="img" aria-label="Speed by distance chart"></canvas><div class="tip" id="speedTip"></div></div>
   </section>
 
   <section class="card">
-    <h2>Mapa toru — gdzie hamują</h2>
-    <p class="hint">Linia referencji pokolorowana siłą hamowania. H1…Hn to strefy hamowania referencji; tabela niżej pokazuje, gdzie hamują pozostali.</p>
-    <div class="chart-wrap map"><canvas id="trackMap" role="img" aria-label="Mapa toru z punktami hamowania"></canvas></div>
+    <h2>Track map — where they brake</h2>
+    <p class="hint">The reference line coloured by braking force. B1…Bn are the reference driver's braking zones; the table below shows where the others brake.</p>
+    <div class="chart-wrap map"><canvas id="trackMap" role="img" aria-label="Track map with braking points"></canvas></div>
     <div class="map-legend">
-      <span>hamulec 0</span><span class="ramp" id="rampBar"></span><span>1</span>
-      <span class="muted">· Hn = początek strefy hamowania referencji</span>
-      <label class="check"><input type="checkbox" id="showLines"> Pokaż linie zaznaczonych kierowców</label>
+      <span>brake 0</span><span class="ramp" id="rampBar"></span><span>1</span>
+      <span class="muted">· Bn = start of the reference braking zone</span>
+      <label class="check"><input type="checkbox" id="showLines"> Show lines of selected drivers</label>
     </div>
   </section>
 
   <section class="card" id="brakingSection">
-    <h2>Strefy hamowania — delty względem referencji</h2>
-    <p class="hint">Strefy scalane, jeśli dzieli je < 60 m (hamowanie dwuetapowe). Δ hamowania: ujemna = hamuje wcześniej (mniejszy dystans), dodatnia = później. Δ gazu: ujemna = wcześniej wciska gaz. Dane rywali odświeżają się ~5 Hz (0,2 s), więc delty < 10–15 m traktuj jako przybliżone.</p>
+    <h2>Braking zones — deltas to the reference</h2>
+    <p class="hint">Zones less than 60 m apart are merged (two-stage braking). Δ braking: negative = brakes earlier (shorter distance), positive = later. Δ throttle: negative = gets on the throttle earlier. Rival data refreshes at ~5 Hz (0.2 s), so treat deltas < 10–15 m as approximate.</p>
     <div class="table-scroll" id="brakingTable"></div>
   </section>
 
   <section class="card">
-    <h2>Najlepsze okrążenia</h2>
+    <h2>Best laps</h2>
     <div class="table-scroll" id="lapsTable"></div>
   </section>
 
   <details class="card" id="dataDetails">
-    <summary>Pokaż tabelę danych wykresów (co 100 m)</summary>
+    <summary>Show the chart data table (every 100 m)</summary>
     <div class="table-scroll" id="dataTable"></div>
   </details>
 
   <footer>
-    <p>Źródło: <span id="inputs"></span>. Dane z pamięci współdzielonej <code>LMU_Data</code> (wszystkie aktywne auta). Pełne przebiegi: <code>traces.csv</code>.</p>
-    <p>Nagrywanie: <code>python record.py --hz 30</code> · analiza: <code>python analyze.py records/plik.csv.gz</code>.</p>
+    <p>Source: <span id="inputs"></span>. Data from the <code>LMU_Data</code> shared memory (all active cars). Full traces: <code>traces.csv</code>.</p>
+    <p>Recording: <code>python record.py --hz 30</code> · analysis: <code>python analyze.py records/file.csv.gz</code>.</p>
   </footer>
 </main>
 
@@ -286,7 +286,7 @@ function fmtDelta(v, unit=' m'){
   return (v >= 0 ? '+' : '') + v.toFixed(1) + unit;
 }
 function displayName(name){
-  return (DATA.player && name === DATA.player) ? name + ' (Ty)' : name;
+  return (DATA.player && name === DATA.player) ? name + ' (you)' : name;
 }
 function driverColorByName(name){
   const i = DATA.drivers.findIndex(d => d.name === name);
@@ -317,7 +317,7 @@ function updateZoomInfo(){
   if (!el) return;
   el.textContent = state.zoom
     ? `${Math.round(state.zoom[0])}–${Math.round(state.zoom[1])} m`
-    : 'cały tor';
+    : 'whole track';
   const reset = $('#zoomReset');
   if (reset) reset.disabled = !state.zoom;
 }
@@ -347,9 +347,9 @@ function focusSelect(){
 function buildFocusSelect(){
   const sel = $('#focusSelect');
   if (!sel) return;
-  sel.innerHTML = '<option value="all">Wszyscy zaznaczeni</option>' +
+  sel.innerHTML = '<option value="all">All selected</option>' +
     DATA.drivers.map((d, i) => `<option value="${i}">${esc(d.name)}</option>`).join('') +
-    '<option value="custom" disabled>Wybrani</option>';
+    '<option value="custom" disabled>Selected</option>';
   sel.addEventListener('change', () => {
     if (sel.value === 'all') state.selected = new Set(DATA.drivers.map((_, i) => i));
     else if (sel.value !== 'custom') state.selected = new Set([parseInt(sel.value, 10)]);
@@ -475,8 +475,8 @@ function drawChart(canvasId, channel, yMax, unit, labelRef){
 function drawCharts(){
   const speedMax = Math.max(1, ...DATA.drivers.flatMap(d => d.speed.map(v => v * 3.6)));
   const speedY = Math.ceil(speedMax / 50) * 50;
-  drawChart('brakeChart', 'brake', 1, 'hamulec', true);
-  drawChart('throttleChart', 'throttle', 1, 'gaz', false);
+  drawChart('brakeChart', 'brake', 1, 'brake', true);
+  drawChart('throttleChart', 'throttle', 1, 'throttle', false);
   drawChart('speedChart', 'speed', speedY, 'km/h', false);
 }
 
@@ -495,7 +495,7 @@ function bindTip(canvasId, tipId, channel){
     const idx = ch.idxOfX(x);
     canvas._hoverIdx = idx;
     drawChart(canvasId, channel, channel === 'speed' ? Math.max(1, Math.ceil(Math.max(...DATA.drivers.flatMap(d => d.speed.map(v => v * 3.6))) / 50) * 50) : 1,
-              channel === 'speed' ? 'km/h' : (channel === 'brake' ? 'hamulec' : 'gaz'), channel === 'brake');
+              channel === 'speed' ? 'km/h' : (channel === 'brake' ? 'brake' : 'throttle'), channel === 'brake');
     const sel = selectedDrivers();
     let rows = '';
     for (const { d, i } of sel){
@@ -504,7 +504,7 @@ function bindTip(canvasId, tipId, channel){
         : channel === 'speed' ? Math.round(v) + ' km/h' : (v * 100).toFixed(0) + '%';
       rows += `<div class="tip-row"><span><span class="swatch" style="background:${color(i)}"></span>${esc(displayName(d.name))}</span><span class="v">${txt}</span></div>`;
     }
-    if (!rows) rows = '<div class="tip-row"><span class="muted">Brak zaznaczonych kierowców</span></div>';
+    if (!rows) rows = '<div class="tip-row"><span class="muted">No drivers selected</span></div>';
     tip.innerHTML = `<div class="tip-title">${Math.round(DATA.grid[idx])} m</div>` + rows;
     tip.classList.add('show');
     const maxLeft = Math.max(8, rect.width - 240);
@@ -638,7 +638,7 @@ function drawMap(){
     ctx.fillStyle = isDark() ? '#d95926' : '#eb6834'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = token('--surface-1'); ctx.stroke();
     ctx.fillStyle = token('--text-primary'); ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
-    ctx.fillText('H' + (j + 1), x + 8, y - 6);
+    ctx.fillText('B' + (j + 1), x + 8, y - 6);
   });
 
   // map hover (nearest point)
@@ -723,16 +723,16 @@ function renderLaps(){
       <td class="num">${(d.coverage * 100).toFixed(1)}%</td>
     </tr>`;
   }).join('');
-  el.innerHTML = `<table><caption>Najlepsze okrążenie każdego kierowcy; śr. Δ względem referencji (${esc(DATA.reference)}).</caption>
-    <thead><tr><th class="num">#</th><th>Kierowca</th><th>Auto</th><th class="num">Okr.</th>
-    <th class="num">Czas</th><th class="num">Strata</th><th class="num">Śr. Δ ham.</th>
-    <th class="num">Śr. Δ gaz</th><th class="num">Pokrycie</th></tr></thead><tbody>${rows}</tbody></table>`;
+  el.innerHTML = `<table><caption>Best lap of each driver; average Δ relative to the reference (${esc(DATA.reference)}).</caption>
+    <thead><tr><th class="num">#</th><th>Driver</th><th>Car</th><th class="num">Lap</th>
+    <th class="num">Time</th><th class="num">Gap</th><th class="num">Avg Δ brake</th>
+    <th class="num">Avg Δ throttle</th><th class="num">Coverage</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderBraking(){
   const el = $('#brakingTable');
   if (!DATA.braking || !DATA.braking.length){
-    el.innerHTML = '<p class="muted">Brak wykrytych stref hamowania (za mało danych lub bardzo miękkie hamowanie).</p>';
+    el.innerHTML = '<p class="muted">No braking zones detected (too little data or very soft braking).</p>';
     return;
   }
   let body = '';
@@ -756,23 +756,23 @@ function renderBraking(){
       </tr>`;
     });
   }
-  el.innerHTML = `<table><caption>Strefy hamowania: początek, koniec, moment ponownego gazu i minimalna prędkość. Δ liczone względem referencji (${esc(DATA.reference)}).</caption>
-    <thead><tr><th>Zakręt</th><th>Kierowca</th><th class="num">Hamowanie [m]</th><th class="num">Δ ham. [m]</th>
-    <th class="num">Koniec [m]</th><th class="num">Gaz [m]</th><th class="num">Δ gazu [m]</th>
-    <th class="num">Vmin [km/h]</th><th class="num">Max ham.</th></tr></thead><tbody>${body}</tbody></table>`;
+  el.innerHTML = `<table><caption>Braking zones: start, end, throttle pickup and minimum speed. Δ relative to the reference (${esc(DATA.reference)}).</caption>
+    <thead><tr><th>Corner</th><th>Driver</th><th class="num">Braking [m]</th><th class="num">Δ brake [m]</th>
+    <th class="num">End [m]</th><th class="num">Throttle [m]</th><th class="num">Δ throttle [m]</th>
+    <th class="num">Vmin [km/h]</th><th class="num">Max brake</th></tr></thead><tbody>${body}</tbody></table>`;
 }
 
 function renderDataTable(){
   const el = $('#dataTable');
   const sel = selectedDrivers();
-  if (!sel.length){ el.innerHTML = '<p class="muted">Zaznacz kierowcę, aby zobaczyć tabelę.</p>'; return; }
+  if (!sel.length){ el.innerHTML = '<p class="muted">Select a driver to see the table.</p>'; return; }
   const N = DATA.grid.length;
   const step = 100;
-  let head1 = '<tr><th rowspan="2">Dystans [m]</th>';
+  let head1 = '<tr><th rowspan="2">Distance [m]</th>';
   let head2 = '<tr>';
   for (const { d, i } of sel){
     head1 += `<th colspan="3" style="text-align:center"><span class="swatch" style="background:${color(i)}"></span>${esc(d.name)}</th>`;
-    head2 += '<th class="num">H</th><th class="num">G</th><th class="num">V</th>';
+    head2 += '<th class="num">B</th><th class="num">T</th><th class="num">V</th>';
   }
   head1 += '</tr>'; head2 += '</tr>';
   let body = '';
@@ -786,7 +786,7 @@ function renderDataTable(){
     }
     body += '</tr>';
   }
-  el.innerHTML = `<table><caption>Wartości co ${step} m: H = hamulec, G = gaz (%), V = prędkość (km/h).</caption>
+  el.innerHTML = `<table><caption>Values every ${step} m: B = brake, T = throttle (%), V = speed (km/h).</caption>
     <thead>${head1}${head2}</thead><tbody>${body}</tbody></table>`;
 }
 let dataTableBuilt = false;
@@ -798,7 +798,7 @@ $('#dataDetails').addEventListener('toggle', () => { if ($('#dataDetails').open)
 /* ---------------- theme ---------------- */
 const themeBtn = $('#themeBtn');
 function updateThemeButton(){
-  themeBtn.textContent = isDark() ? 'Jasny motyw' : 'Ciemny motyw';
+  themeBtn.textContent = isDark() ? 'Light theme' : 'Dark theme';
   themeBtn.setAttribute('aria-pressed', String(isDark()));
 }
 function setTheme(t){
@@ -824,7 +824,7 @@ function initSummary(){
     $('#gapP2').textContent = fmtDelta(DATA.drivers[1].lap_time - d0.lap_time, ' s');
     $('#gapP2Name').textContent = DATA.drivers[1].name;
   } else {
-    $('#gapP2').textContent = '—'; $('#gapP2Name').textContent = 'brak drugiego kierowcy';
+    $('#gapP2').textContent = '—'; $('#gapP2Name').textContent = 'no second driver';
   }
   $('#driverCount').textContent = String(DATA.drivers.length);
   $('#trackLen').textContent = (DATA.track_length / 1000).toFixed(2) + ' km';

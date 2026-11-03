@@ -53,17 +53,17 @@ SESSION_NAMES = {
     10: "race", 11: "race", 12: "race", 13: "race",
 }
 FILTERS = [
-    ("szybsi lub szybszy sektor", "faster_or_sector"),
-    ("tylko szybsi", "faster"),
-    ("wszyscy", "all"),
+    ("faster or faster sector", "faster_or_sector"),
+    ("faster only", "faster"),
+    ("everyone", "all"),
 ]
 NO_WINDOW = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 CHILD_ENV = dict(os.environ, PYTHONIOENCODING="utf-8")
 
-# status z record.py: "[REC] tor | sesja | auta=N | best=97.707 (kierowca) | 123 wierszy | 1.2 MB"
+# record.py status line: "[REC] track | session | cars=N | best=97.707 (driver) | 123 rows | 1.2 MB"
 REC_STATUS_RE = re.compile(
-    r"\[REC\] (?P<track>.+?) \| (?P<session>.+?) \| auta=(?P<cars>\d+) \| "
-    r"best=(?P<best>\S+)(?: \((?P<who>.*?)\))? \| (?P<rows>\d+) wierszy \| "
+    r"\[REC\] (?P<track>.+?) \| (?P<session>.+?) \| cars=(?P<cars>\d+) \| "
+    r"best=(?P<best>\S+)(?: \((?P<who>.*?)\))? \| (?P<rows>\d+) rows \| "
     r"(?P<mb>[\d.]+) MB")
 
 C_BG = lmu_theme.BG
@@ -118,6 +118,10 @@ def fmt_dur(sec):
     return f"{sec // 3600:d}:{sec % 3600 // 60:02d}:{sec % 60:02d}"
 
 
+def plural(n, word):
+    return f"{n} {word}" + ("" if n == 1 else "s")
+
+
 def same_driver(a, b):
     if not a or not b:
         return False
@@ -169,6 +173,11 @@ class LmuApp:
         self.root.after(1000, self._tick)
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    def _opt(self, key, default, allowed):
+        """Saved option, or the default when it is not one of the current choices."""
+        v = self.settings.get(key, default)
+        return v if v in allowed else default
+
     # ================================================================ wyglad
     def _style(self):
         lmu_theme.apply(self.root, FONT)
@@ -182,9 +191,9 @@ class LmuApp:
         header.pack(fill="x")
         tk.Label(header, text="LMU Telemetry", background=C_BG, foreground=C_TEXT,
                  font=(FONT, 22, "bold")).pack(side="left", padx=(18, 12), pady=(12, 2))
-        tk.Label(header, text="nagrywanie · analiza · porównanie z rywalami — offline",
+        tk.Label(header, text="recording · analysis · rival comparison — offline",
                  background=C_BG, foreground=C_MUTED, font=(FONT, 10)).pack(side="left", pady=(14, 0))
-        self.pill = ttk.Label(header, text="● Gotowe", style="PillOk.TLabel")
+        self.pill = ttk.Label(header, text="● Ready", style="PillOk.TLabel")
         self.pill.pack(side="right", padx=18, pady=(12, 0))
         self.header_line = tk.Frame(self.root, height=0, background=C_BG)
         self.header_line.pack(fill="x")
@@ -192,12 +201,12 @@ class LmuApp:
         # --- stopka (status + log)
         foot = ttk.Frame(self.root, padding=(14, 3, 14, 5))
         foot.pack(side="bottom", fill="x")
-        self.status = ttk.Label(foot, text="Gotowe.", style="Muted.TLabel")
+        self.status = ttk.Label(foot, text="Ready.", style="Muted.TLabel")
         self.status.pack(side="left")
-        self.btn_log = ttk.Button(foot, text="Pokaż log ▾", style="Link.TButton",
+        self.btn_log = ttk.Button(foot, text="Show log ▾", style="Link.TButton",
                                   command=self.toggle_log)
         self.btn_log.pack(side="right")
-        ttk.Label(foot, text="F9 nagrywanie · F5 odśwież · Ctrl+L log",
+        ttk.Label(foot, text="F9 record · F5 refresh · Ctrl+L log",
                   style="Muted.TLabel").pack(side="right", padx=(0, 14))
         self.progress = ttk.Progressbar(foot, mode="indeterminate", length=150)
 
@@ -236,39 +245,39 @@ class LmuApp:
         card = self._card(parent, padding=(12, 10))
         card.pack(fill="x")
         card.columnconfigure(2, weight=1)
-        self.btn_rec = ttk.Button(card, text="●  Nagrywaj", style="Rec.TButton",
+        self.btn_rec = ttk.Button(card, text="●  Record", style="Rec.TButton",
                                   command=self.toggle_recording)
         self.btn_rec.grid(row=0, column=0, rowspan=2, sticky="w")
         self.rec_timer = tk.Label(card, text="0:00:00", background=C_CARD, foreground=C_MUTED,
                                   font=("Consolas", 20, "bold"))
         self.rec_timer.grid(row=0, column=1, rowspan=2, padx=(16, 16))
-        self.rec_state = tk.Label(card, text="Nie nagrywa", background=C_CARD,
+        self.rec_state = tk.Label(card, text="Not recording", background=C_CARD,
                                   foreground=C_TEXT, font=(FONT, 11, "bold"), anchor="w")
         self.rec_state.grid(row=0, column=2, sticky="w")
         self.rec_hint = tk.Label(card, background=C_CARD, foreground=C_MUTED, anchor="w",
                                  font=(FONT, 9), justify="left",
-                                 text="Uruchom LMU, wjedź na tor albo odtwórz replay i kliknij "
-                                      "Nagrywaj. Zapisują się wszystkie auta.")
+                                 text="Start LMU, get on track or play a replay and click "
+                                      "Record. All cars are recorded.")
         self.rec_hint.grid(row=1, column=2, sticky="w")
         tools = ttk.Frame(card, style="White.TFrame")
         tools.grid(row=0, column=3, rowspan=2, sticky="e")
         self.auto_analyze_var = tk.BooleanVar(value=self.settings.get("auto_analyze", True))
-        ttk.Checkbutton(tools, text="po stopie analizuj i pokaż", style="Card.TCheckbutton",
+        ttk.Checkbutton(tools, text="analyze and show after stop", style="Card.TCheckbutton",
                         variable=self.auto_analyze_var, command=self.save_settings).pack(
             side="left", padx=(0, 12))
         self.voice_on = tk.BooleanVar(value=self.settings.get("voice_on", False))
-        ttk.Checkbutton(tools, text="inżynier głosowy", style="Card.TCheckbutton",
+        ttk.Checkbutton(tools, text="voice engineer", style="Card.TCheckbutton",
                         variable=self.voice_on, command=self._toggle_voice).pack(side="left",
                                                                                  padx=(0, 8))
-        ttk.Button(tools, text="Panel VR", command=self.open_vr_panel).pack(side="left",
+        ttk.Button(tools, text="VR panel", command=self.open_vr_panel).pack(side="left",
                                                                          padx=(0, 12))
         ttk.Label(tools, text="Hz:", style="WMuted.TLabel").pack(side="left")
         self.hz_var = tk.StringVar(value=str(self.settings.get("hz", "30")))
         ttk.Combobox(tools, textvariable=self.hz_var, width=4, state="readonly",
                      values=["30", "60", "100"]).pack(side="left", padx=(4, 12))
-        self.btn_probe = ttk.Button(tools, text="Test połączenia", command=self.run_probe)
+        self.btn_probe = ttk.Button(tools, text="Test connection", command=self.run_probe)
         self.btn_probe.pack(side="left")
-        ttk.Button(tools, text="Folder nagrań",
+        ttk.Button(tools, text="Recordings folder",
                    command=lambda: self._open_path(RECORDS)).pack(side="left", padx=(8, 0))
 
     # ================================================================ biblioteka
@@ -278,11 +287,11 @@ class LmuApp:
         self.search_var = tk.StringVar()
         ent = ttk.Entry(bar, textvariable=self.search_var)
         ent.pack(side="left", fill="x", expand=True)
-        self._placeholder(ent, "Szukaj toru lub kierowcy…")
+        self._placeholder(ent, "Search track or driver…")
         self.search_var.trace_add("write", lambda *a: self._fill_library())
-        self.sess_filter = tk.StringVar(value="wszystkie")
+        self.sess_filter = tk.StringVar(value="all")
         cb = ttk.Combobox(bar, textvariable=self.sess_filter, width=10, state="readonly",
-                          values=["wszystkie", "practice", "quali", "race", "warmup", "testday"])
+                          values=["all", "practice", "quali", "race", "warmup", "testday"])
         cb.pack(side="left", padx=(6, 0))
         cb.bind("<<ComboboxSelected>>", lambda e: self._fill_library())
 
@@ -290,9 +299,9 @@ class LmuApp:
         box.pack(fill="both", expand=True)
         self.lib = ttk.Treeview(box, columns=("best", "mine", "rep"), show="tree headings",
                                 selectmode="browse")
-        self.lib.heading("#0", text="Tor / sesja")
-        self.lib.heading("best", text="Najlepszy")
-        self.lib.heading("mine", text="Mój")
+        self.lib.heading("#0", text="Track / session")
+        self.lib.heading("best", text="Best")
+        self.lib.heading("mine", text="Mine")
         self.lib.heading("rep", text="✓")
         self.lib.column("#0", width=190, stretch=True)
         self.lib.column("best", width=74, anchor="center", stretch=False)
@@ -314,21 +323,21 @@ class LmuApp:
 
         bot = ttk.Frame(f)
         bot.pack(fill="x", pady=(6, 0))
-        self.btn_batch = ttk.Button(bot, text="Analizuj nowe", command=self.analyze_all_missing)
+        self.btn_batch = ttk.Button(bot, text="Analyze new", command=self.analyze_all_missing)
         self.btn_batch.pack(side="left")
-        self.btn_import = ttk.Button(bot, text="Import z gry", command=self.import_game)
+        self.btn_import = ttk.Button(bot, text="Import from game", command=self.import_game)
         self.btn_import.pack(side="left", padx=(6, 0))
-        ttk.Button(bot, text="⟳ Odśwież", command=self.refresh_library).pack(side="right")
+        ttk.Button(bot, text="⟳ Refresh", command=self.refresh_library).pack(side="right")
         self.lib_count = ttk.Label(f, text="", style="Muted.TLabel", wraplength=380)
         self.lib_count.pack(fill="x", pady=(4, 0))
 
         self.lib_menu = tk.Menu(self.root, tearoff=0)
-        self.lib_menu.add_command(label="Analizuj", command=self.analyze_current)
-        self.lib_menu.add_command(label="Otwórz raport HTML", command=self.open_in_browser)
-        self.lib_menu.add_command(label="Eksport do TinyPedal", command=self.export_tinypedal)
+        self.lib_menu.add_command(label="Analyze", command=self.analyze_current)
+        self.lib_menu.add_command(label="Open HTML report", command=self.open_in_browser)
+        self.lib_menu.add_command(label="Export to TinyPedal", command=self.export_tinypedal)
         self.lib_menu.add_separator()
-        self.lib_menu.add_command(label="Pokaż plik nagrania", command=self.reveal_record)
-        self.lib_menu.add_command(label="Folder wyników", command=self.open_result_dir)
+        self.lib_menu.add_command(label="Show recording file", command=self.reveal_record)
+        self.lib_menu.add_command(label="Results folder", command=self.open_result_dir)
 
     def _placeholder(self, entry, text):
         var = self.search_var
@@ -359,7 +368,7 @@ class LmuApp:
     def _build_viewer(self, f):
         top = self.v_top = self._card(f, padding=(14, 10))
         top.pack(fill="x")
-        self.v_title = tk.Label(top, text="Wybierz sesję albo tor z listy", background=C_CARD,
+        self.v_title = tk.Label(top, text="Pick a session or a track from the list", background=C_CARD,
                                 foreground=C_TEXT, font=(FONT, 14, "bold"), anchor="w")
         self.v_title.pack(fill="x")
         self.v_sub = tk.Label(top, text="", background=C_CARD, foreground=C_MUTED, anchor="w",
@@ -372,15 +381,15 @@ class LmuApp:
         def lbl(t):
             ttk.Label(self.track_opts, text=t, style="WMuted.TLabel").pack(side="left", padx=(0, 4))
 
-        lbl("Ja:")
+        lbl("Me:")
         self.player_var = tk.StringVar(value=self.settings.get("player", ""))
         self.player_combo = ttk.Combobox(self.track_opts, textvariable=self.player_var, width=22)
         self.player_combo.pack(side="left", padx=(0, 12))
-        lbl("moje okrążenie:")
+        lbl("my lap:")
         self.player_lap_var = tk.StringVar(value=str(self.settings.get("player_lap", 1)))
         ttk.Combobox(self.track_opts, textvariable=self.player_lap_var, width=3, state="readonly",
                      values=["1", "2", "3"]).pack(side="left", padx=(0, 12))
-        lbl("rywale:")
+        lbl("rivals:")
         self.filter_var = tk.StringVar(value=self.settings.get("filter", FILTERS[0][0]))
         if self.filter_var.get() not in [x[0] for x in FILTERS]:
             self.filter_var.set(FILTERS[0][0])
@@ -394,24 +403,24 @@ class LmuApp:
         acts = ttk.Frame(top, style="White.TFrame")
         acts.pack(fill="x", pady=(8, 0))
         self.acts = acts
-        self.btn_analyze = ttk.Button(acts, text="Analizuj", style="Accent.TButton",
+        self.btn_analyze = ttk.Button(acts, text="Analyze", style="Accent.TButton",
                                       command=self.analyze_current, state="disabled")
         self.btn_analyze.pack(side="left")
-        self.btn_browser = ttk.Button(acts, text="Raport HTML", command=self.open_in_browser,
+        self.btn_browser = ttk.Button(acts, text="HTML report", command=self.open_in_browser,
                                       state="disabled")
         self.btn_browser.pack(side="left", padx=(8, 0))
-        self.btn_tp = ttk.Button(acts, text="Eksport do TinyPedal", command=self.export_tinypedal,
+        self.btn_tp = ttk.Button(acts, text="Export to TinyPedal", command=self.export_tinypedal,
                                  state="disabled")
         self.btn_tp.pack(side="left", padx=(8, 0))
         self.btn_dir = ttk.Button(acts, text="Folder", command=self.open_result_dir,
                                   state="disabled")
         self.btn_dir.pack(side="left", padx=(8, 0))
-        self.cls_mode = tk.StringVar(value=self.settings.get("cls_mode", "moja klasa"))
+        self.cls_mode = tk.StringVar(value=self._opt("cls_mode", "my class", ("my class", "all classes")))
         cb = ttk.Combobox(acts, textvariable=self.cls_mode, width=14, state="readonly",
-                          values=["moja klasa", "wszystkie klasy"])
+                          values=["my class", "all classes"])
         cb.pack(side="right")
         cb.bind("<<ComboboxSelected>>", lambda e: self.save_settings())
-        ttk.Label(acts, text="Analiza porównuje:", style="WMuted.TLabel").pack(side="right",
+        ttk.Label(acts, text="Analysis compares:", style="WMuted.TLabel").pack(side="right",
                                                                               padx=(0, 6))
 
         body = self.v_body = ttk.Frame(f)
@@ -420,7 +429,7 @@ class LmuApp:
         self.v_empty_msg = tk.Label(self.v_empty, background=C_CARD, foreground=C_MUTED,
                                     font=(FONT, 12), justify="center", wraplength=560)
         self.v_empty_msg.place(relx=0.5, rely=0.42, anchor="center")
-        self.v_empty_btn = ttk.Button(self.v_empty, text="Analizuj", style="Accent.TButton",
+        self.v_empty_btn = ttk.Button(self.v_empty, text="Analyze", style="Accent.TButton",
                                       command=self.analyze_current)
 
         self.vnb = ttk.Notebook(body)
@@ -434,19 +443,19 @@ class LmuApp:
         self._build_tab_fuel()
         self._build_tab_coach()
         self.vnb.bind("<<NotebookTabChanged>>", lambda e: self._on_view_tab())
-        self._show_empty("Wybierz sesję albo tor z listy po lewej.")
+        self._show_empty("Pick a session or a track from the list on the left.")
 
     def _build_tab_results(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Wyniki  ")
+        self.vnb.add(f, text="  Results  ")
         cols = ("show", "pos", "driver", "lap", "gap", "brake", "pickup", "rate", "vehicle")
         self.board = ttk.Treeview(f, columns=cols, show="headings", selectmode="browse")
         for c, (text, width, anchor) in {
-            "show": ("Wykres", 64, "center"), "pos": ("#", 34, "center"),
-            "driver": ("Kierowca", 230, "w"), "lap": ("Czas", 90, "center"),
-            "gap": ("Strata", 75, "center"), "brake": ("Δ hamowania", 100, "center"),
-            "pickup": ("Δ gazu", 85, "center"), "rate": ("Dane", 70, "center"),
-            "vehicle": ("Auto", 220, "w"),
+            "show": ("Chart", 64, "center"), "pos": ("#", 34, "center"),
+            "driver": ("Driver", 230, "w"), "lap": ("Time", 90, "center"),
+            "gap": ("Gap", 75, "center"), "brake": ("Δ braking", 100, "center"),
+            "pickup": ("Δ throttle", 85, "center"), "rate": ("Data", 70, "center"),
+            "vehicle": ("Car", 220, "w"),
         }.items():
             self.board.heading(c, text=text)
             self.board.column(c, width=width, anchor=anchor, stretch=c == "vehicle")
@@ -454,10 +463,10 @@ class LmuApp:
         sb = ttk.Scrollbar(f, orient="vertical", command=self.board.yview)
         self.board.configure(yscrollcommand=sb.set)
         ttk.Label(f, style="Muted.TLabel", wraplength=900, justify="left",
-                  text="Kliknij ☐/☑ w kolumnie „Wykres”, aby dodać/usunąć kierowcę z wykresów "
-                       "i mapy. Dwuklik = przejdź do wykresów.  ★ = referencja.  Δ hamowania / "
-                       "Δ gazu: średnio w metrach względem referencji (ujemne = wcześniej). "
-                       "„Dane” = ile próbek/s ma okrążenie: przy ~5 Hz różnice < 10–15 m są przybliżone.").pack(
+                  text="Click ☐/☑ in the “Chart” column to add/remove a driver from the charts "
+                       "and map. Double-click = go to the charts.  ★ = reference.  Δ braking / "
+                       "Δ throttle: average in metres relative to the reference (negative = earlier). "
+                       "“Data” = samples/s of the lap: at ~5 Hz differences < 10–15 m are approximate.").pack(
             side="bottom", fill="x", pady=(6, 0))
         self.board.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
@@ -467,10 +476,10 @@ class LmuApp:
 
     def _build_tab_charts(self):
         f = ttk.Frame(self.vnb, padding=(8, 6, 8, 8))
-        self.vnb.add(f, text="  Wykresy i mapa  ")
+        self.vnb.add(f, text="  Charts & map  ")
         cmp = ttk.Frame(f)
         cmp.pack(fill="x", pady=(0, 6))
-        ttk.Label(cmp, text="Porównaj:", font=(FONT, 10, "bold")).pack(side="left")
+        ttk.Label(cmp, text="Compare:", font=(FONT, 10, "bold")).pack(side="left")
         self.focus_var = tk.StringVar()
         self.focus_combo = ttk.Combobox(cmp, textvariable=self.focus_var, width=24,
                                         state="readonly")
@@ -480,15 +489,15 @@ class LmuApp:
         self.base_combo = ttk.Combobox(cmp, textvariable=self.base_var, width=24,
                                        state="readonly")
         self.base_combo.pack(side="left", padx=(6, 6))
-        ttk.Button(cmp, text="↔ zamień", command=self._swap_compare).pack(side="left")
+        ttk.Button(cmp, text="↔ swap", command=self._swap_compare).pack(side="left")
         for cb in (self.focus_combo, self.base_combo):
             cb.bind("<<ComboboxSelected>>", lambda e: self._on_compare())
-        self.btn_full = ttk.Button(cmp, text="⛶ Pełny ekran", command=self.toggle_fullscreen)
+        self.btn_full = ttk.Button(cmp, text="⛶ Full screen", command=self.toggle_fullscreen)
         self.btn_full.pack(side="right")
-        ttk.Button(cmp, text="Cały tor", command=lambda: self.chart.reset_zoom()).pack(
+        ttk.Button(cmp, text="Whole track", command=lambda: self.chart.reset_zoom()).pack(
             side="right", padx=(0, 8))
         self.map_delta_var = tk.BooleanVar(value=self.settings.get("map_delta", True))
-        ttk.Checkbutton(cmp, text="mapa: zysk / strata", variable=self.map_delta_var,
+        ttk.Checkbutton(cmp, text="map: gain / loss", variable=self.map_delta_var,
                         command=self._on_compare).pack(side="right", padx=(0, 12))
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(0, 6))
@@ -502,23 +511,23 @@ class LmuApp:
         pane.add(mbox, weight=2)
         self.chart = ChartView(cbox, on_hover=self._chart_hover, on_range=self._chart_range,
                                on_option=self.save_settings,
-                               seg_mode=self.settings.get("seg_mode", "hamowania"),
-                               seg_sort=self.settings.get("seg_sort", "po kolei"))
+                               seg_mode=self.settings.get("seg_mode", "braking"),
+                               seg_sort=self.settings.get("seg_sort", "in order"))
         self.chart.pack(fill="both", expand=True, pady=(4, 0))
         self.map = MapView(mbox, on_pick=self._map_pick, on_hover=self._map_hover)
         self.map.pack(fill="both", expand=True)
 
     def _build_tab_braking(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Strefy hamowania  ")
+        self.vnb.add(f, text="  Braking zones  ")
         cols = ("start", "dstart", "end", "pickup", "dpickup", "vmin", "maxb")
         self.brk = ttk.Treeview(f, columns=cols, show="tree headings")
-        self.brk.heading("#0", text="Zakręt / kierowca")
+        self.brk.heading("#0", text="Corner / driver")
         self.brk.column("#0", width=230)
         for c, (text, width) in {
-            "start": ("Start ham. [m]", 105), "dstart": ("Δ start", 80),
-            "end": ("Koniec [m]", 90), "pickup": ("Gaz [m]", 80), "dpickup": ("Δ gaz", 80),
-            "vmin": ("V min [km/h]", 95), "maxb": ("Max ham.", 80),
+            "start": ("Brake start [m]", 105), "dstart": ("Δ start", 80),
+            "end": ("End [m]", 90), "pickup": ("Throttle [m]", 80), "dpickup": ("Δ throttle", 80),
+            "vmin": ("V min [km/h]", 95), "maxb": ("Max brake", 80),
         }.items():
             self.brk.heading(c, text=text)
             self.brk.column(c, width=width, anchor="center", stretch=False)
@@ -528,8 +537,8 @@ class LmuApp:
         sb = ttk.Scrollbar(f, orient="vertical", command=self.brk.yview)
         self.brk.configure(yscrollcommand=sb.set)
         ttk.Label(f, style="Muted.TLabel",
-                  text="Pokazani są kierowcy zaznaczeni w Wynikach.  Δ ujemna = wcześniej niż "
-                       "referencja.  Dwuklik na zakręcie = przybliż go na wykresie.").pack(
+                  text="Shows the drivers selected in Results.  Negative Δ = earlier than "
+                       "the reference.  Double-click a corner = zoom to it on the chart.").pack(
             side="bottom", fill="x", pady=(6, 0))
         self.brk.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
@@ -537,16 +546,16 @@ class LmuApp:
 
     def _build_tab_brief(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Brief AI  ")
+        self.vnb.add(f, text="  AI brief  ")
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(0, 6))
         ttk.Label(bar, style="Muted.TLabel",
-                  text="Gotowe tabele + prompt. Skopiuj i wklej do Claude / ChatGPT — "
-                       "nic nie jest wysyłane automatycznie.").pack(side="left")
-        self.btn_copy = ttk.Button(bar, text="Kopiuj do schowka", style="Accent.TButton",
+                  text="Ready-made tables + prompt. Copy and paste into Claude / ChatGPT — "
+                       "nothing is sent automatically.").pack(side="left")
+        self.btn_copy = ttk.Button(bar, text="Copy to clipboard", style="Accent.TButton",
                                    command=self.copy_brief)
         self.btn_copy.pack(side="right")
-        ttk.Button(bar, text="Zapisz jako…", command=self.save_brief).pack(side="right", padx=(0, 8))
+        ttk.Button(bar, text="Save as…", command=self.save_brief).pack(side="right", padx=(0, 8))
         box = ttk.Frame(f)
         box.pack(fill="both", expand=True)
         self.brief = tk.Text(box, wrap="word", font=("Consolas", 10), background=C_CARD,
@@ -562,18 +571,18 @@ class LmuApp:
     # ================================================================ plan treningu
     def _build_tab_coach(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Plan treningu  ")
+        self.vnb.add(f, text="  Training plan  ")
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(0, 6))
-        ttk.Label(bar, text="Porównaj z:", style="Muted.TLabel").pack(side="left")
-        self.co_rival = tk.StringVar(value="najszybszy na każdym odcinku")
+        ttk.Label(bar, text="Compare with:", style="Muted.TLabel").pack(side="left")
+        self.co_rival = tk.StringVar(value="fastest on each segment")
         self.co_rival_cb = ttk.Combobox(bar, textvariable=self.co_rival, width=30, state="readonly")
         self.co_rival_cb.pack(side="left", padx=(6, 14))
         self.co_rival_cb.bind("<<ComboboxSelected>>", lambda e: self._fill_coach())
-        ttk.Label(bar, text="Pokaż:", style="Muted.TLabel").pack(side="left")
-        self.co_top = tk.StringVar(value=self.settings.get("co_top", "3 zakręty"))
+        ttk.Label(bar, text="Show:", style="Muted.TLabel").pack(side="left")
+        self.co_top = tk.StringVar(value=self._opt("co_top", "3 corners", ("3 corners", "5 corners", "all")))
         cb = ttk.Combobox(bar, textvariable=self.co_top, width=12, state="readonly",
-                          values=["3 zakręty", "5 zakrętów", "wszystkie"])
+                          values=["3 corners", "5 corners", "all"])
         cb.pack(side="left", padx=(6, 0))
         cb.bind("<<ComboboxSelected>>", lambda e: (self._fill_coach(), self.save_settings()))
         box = self._card(f, padding=(4, 4))
@@ -602,7 +611,7 @@ class LmuApp:
         if not a or not info:
             return
         me = next((n for n in a.drivers if same_driver(n, self._player_for(info))), None)
-        vals = ["najszybszy na każdym odcinku"] + [n for n in a.drivers if n != me]
+        vals = ["fastest on each segment"] + [n for n in a.drivers if n != me]
         self.co_rival_cb["values"] = vals
         if self.co_rival.get() not in vals:
             self.co_rival.set(vals[0])
@@ -620,49 +629,49 @@ class LmuApp:
             return
         me = next((n for n in a.drivers if same_driver(n, self._player_for(info))), None)
         if not me:
-            T.insert("end", "Nie ma Cię w tej analizie.\n", "h1")
-            T.insert("end", "Ustaw swojego kierowcę („Ja”) albo przeanalizuj sesję, w której jechałeś.",
+            T.insert("end", "You are not in this analysis.\n", "h1")
+            T.insert("end", "Set your driver (“Me”) or analyze a session you drove in.",
                      "sum")
             T.configure(state="disabled")
             return
         rv = self.co_rival.get()
-        rival = None if rv == "najszybszy na każdym odcinku" else rv
+        rival = None if rv == "fastest on each segment" else rv
         res = lmu_coach.plan(a, me, rival)
         losses = [c for c in res if c["loss"] > 0.01]
         gains = sorted([c for c in res if c["loss"] < -0.01], key=lambda c: c["loss"])
-        n = {"3 zakręty": 3, "5 zakrętów": 5}.get(self.co_top.get(), len(losses))
+        n = {"3 corners": 3, "5 corners": 5}.get(self.co_top.get(), len(losses))
         top = losses[:n]
         top_sum = sum(c["loss"] for c in top)
-        who = short_name(rival, 24) if rival else "najszybszych na każdym odcinku"
-        T.insert("end", f"Plan treningu — {short_name(me, 24)} vs {who}\n", "h1")
+        who = short_name(rival, 24) if rival else "the fastest on each segment"
+        T.insert("end", f"Training plan — {short_name(me, 24)} vs {who}\n", "h1")
         if top:
-            word = "zakręt" if len(top) == 1 else ("zakręty" if len(top) < 5 else "zakrętów")
-            T.insert("end", f"Na okrążeniu tracisz łącznie {sum(c['loss'] for c in losses):.2f} s. "
-                            f"{len(top)} {word} poniżej to {top_sum:.2f} s — od nich zacznij.\n", "sum")
+            word = "corner" if len(top) == 1 else "corners"
+            T.insert("end", f"In total you lose {sum(c['loss'] for c in losses):.2f} s per lap. "
+                            f"The {len(top)} {word} below account for {top_sum:.2f} s — start with them.\n", "sum")
         else:
-            T.insert("end", "Nigdzie nie tracisz wyraźnie — świetnie!\n", "sum")
+            T.insert("end", "No clear losses anywhere — great!\n", "sum")
         for k, c in enumerate(top, 1):
             T.insert("end", f"{k}. {c['name']}   ", "corner")
             T.insert("end", f"{c['loss']:+.3f} s", "loss")
             parts = []
             if c["entry"] is not None:
-                parts.append(f"wejście {c['entry']:+.2f}")
+                parts.append(f"entry {c['entry']:+.2f}")
             if c["exit"] is not None:
-                parts.append(f"wyjście {c['exit']:+.2f}")
+                parts.append(f"exit {c['exit']:+.2f}")
             T.insert("end", f"    {' · '.join(parts)}"
                             + (f"  ·  vs {short_name(c['rival'], 18)}" if not rival else "")
                             + f"  ·  {c['d0']:.0f}–{c['d1']:.0f} m   ", "split")
-            btn = ttk.Button(T, text="pokaż na wykresie", style="Link.TButton",
+            btn = ttk.Button(T, text="show on chart", style="Link.TButton",
                              command=lambda c=c: self._coach_show(c))
             T.window_create("end", window=btn)
             T.insert("end", "\n")
             if not c["reasons"]:
-                T.insert("end", "• różnica rozłożona równo — bez jednej wyraźnej przyczyny\n", "reason")
+                T.insert("end", "• the difference is spread evenly — no single clear cause\n", "reason")
             for _, text, tip in c["reasons"][:3]:
                 T.insert("end", f"• {text}\n", "reason")
                 T.insert("end", f"→ {tip}\n", "tip")
         if gains:
-            T.insert("end", "Gdzie jesteś szybszy (tak trzymaj)\n", "h2")
+            T.insert("end", "Where you are faster (keep it up)\n", "h2")
             for c in gains[:6]:
                 T.insert("end", f"{c['name']}  ", "split")
                 T.insert("end", f"{c['loss']:+.3f} s", "gain")
@@ -671,10 +680,10 @@ class LmuApp:
             T.insert("end", "\n")
         rivals = [rival] if rival else [c["rival"] for c in top]
         low = any(a.rate.get(r, 99) < 15 for r in rivals)
-        T.insert("end", ("Uwaga: dane rywali mają ~5 Hz — punkty hamowania i gazu ±10 m, linia "
-                         "przybliżona. " if low else "")
-                 + "Wskazówki są orientacyjne: zmieniaj jedną rzecz naraz i sprawdzaj w kolejnej "
-                   "sesji.\n", "note")
+        T.insert("end", ("Note: rival data is ~5 Hz — braking and throttle points ±10 m, line "
+                         "approximate. " if low else "")
+                 + "Tips are indicative: change one thing at a time and check in the next "
+                   "session.\n", "note")
         T.configure(state="disabled")
 
     def _coach_show(self, c):
@@ -694,24 +703,21 @@ class LmuApp:
             ev = json.loads(line.split("[LAP]", 1)[1])
         except (ValueError, IndexError):
             return
-        lang = self.voice.lang if self.voice_on.get() else "pl"
         if self.voice_on.get():
-            lang = self.voice.ensure()
-        msg = self.engineer.feed(ev, lang)
-        self.log(f"inżynier: {msg}")
+            self.voice.ensure()
+        msg = self.engineer.feed(ev, "en")
+        self.log(f"engineer: {msg}")
         if self.voice_on.get() and msg:
             self.voice.say(msg)
-        self._vr_update(msg if lang == "pl" else self.engineer.message("pl"))
+        self._vr_update(msg)
 
     def _toggle_voice(self):
         self.save_settings()
         if self.voice_on.get():
             def hello():
-                lang = self.voice.ensure()
-                self.voice.say("Inżynier gotowy." if lang == "pl" else "Engineer ready.")
-                if lang != "pl":
-                    self.q.put(("log", f"głos: {self.voice.voice} (brak polskiego głosu — dodaj "
-                                       "go w Ustawienia Windows → Czas i język → Mowa)"))
+                self.voice.ensure()
+                self.voice.say("Engineer ready.")
+                self.q.put(("log", f"voice: {self.voice.voice}"))
             threading.Thread(target=hello, daemon=True).start()
         else:
             self.voice.stop()
@@ -721,7 +727,7 @@ class LmuApp:
             self.vr_win.lift()
             return
         w = self.vr_win = tk.Toplevel(self.root)
-        w.title("LMU Panel VR")
+        w.title("LMU VR Panel")
         w.configure(background="#000000")
         w.geometry("560x330")
         w.attributes("-topmost", bool(self.settings.get("vr_top", False)))
@@ -735,8 +741,8 @@ class LmuApp:
             lab.pack(fill="x", padx=16, pady=(8 if key == "time" else 0, 0))
             self.vr_lbl[key] = lab
         self.vr_lbl["msg"].configure(
-            text="Czekam na pierwsze okrążenie…\nW goglach: OpenKneeboard → dodaj kartę "
-                 "„Window capture” → okno „LMU Panel VR”.")
+            text="Waiting for the first lap…\nIn the headset: OpenKneeboard → add a "
+                 "“Window capture” tab → window “LMU VR Panel”.")
         if self.engineer.state:
             self._vr_update("")
 
@@ -745,27 +751,27 @@ class LmuApp:
             return
         s = self.engineer.state
         L = self.vr_lbl
-        lap = f"Okr. {s.get('lap')}  " if s.get("lap") is not None else ""
+        lap = f"Lap {s.get('lap')}  " if s.get("lap") is not None else ""
         L["time"].configure(text=(lap + fmt_lap(s["time"])) if s.get("time") else lap + "—")
         d = s.get("delta")
         if s.get("pb"):
-            L["delta"].configure(text="NAJLEPSZE OKRĄŻENIE", fg="#bf5af2")
+            L["delta"].configure(text="PERSONAL BEST", fg="#bf5af2")
         elif d is not None:
-            L["delta"].configure(text=f"{d:+.3f} s do najlepszego", fg="#ff453a" if d > 0 else "#30d158")
+            L["delta"].configure(text=f"{d:+.3f} s to best", fg="#ff453a" if d > 0 else "#30d158")
         else:
             L["delta"].configure(text="", fg="#30d158")
         if s.get("left") is not None:
             unit = "%" if s["use_ve"] else " L"
             amount = s["ve"] * (100 if s["use_ve"] and s["ve"] < 1.5 else 1) if s["use_ve"] else s["fuel"]
-            L["fuel"].configure(text=f"Paliwo {amount:.1f}{unit}  ·  na {s['left']:.1f} okr.",
+            L["fuel"].configure(text=f"Fuel {amount:.1f}{unit}  ·  for {s['left']:.1f} laps",
                                 fg="#ff453a" if s["left"] < 1.6 else "#ffffff")
         need = s.get("need")
         if need is not None and s.get("session") == "race":
             need *= s.get("ve_scale", 1.0) if s.get("use_ve") else 1.0
             L["finish"].configure(
-                text=(f"Do mety (~{s['remain']} okr.): brakuje {need:.1f} — oszczędzaj "
-                      f"{need / s['remain']:.2f}/okr." if need > 0 else
-                      f"Do mety (~{s['remain']} okr.): wystarczy, zapas {-need:.1f}"),
+                text=(f"To the finish (~{s['remain']} laps): short {need:.1f} — save "
+                      f"{need / s['remain']:.2f}/lap" if need > 0 else
+                      f"To the finish (~{s['remain']} laps): enough, {-need:.1f} spare"),
                 fg="#ff453a" if need > 0 else "#30d158")
         else:
             L["finish"].configure(text="")
@@ -775,7 +781,7 @@ class LmuApp:
     # ================================================================ paliwo
     def _build_tab_fuel(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Paliwo  ")
+        self.vnb.add(f, text="  Fuel  ")
         left = self._card(f, padding=(16, 12))
         left.pack(side="left", fill="y", padx=(0, 10))
         W = lambda: tk.Frame(left, background=C_CARD)
@@ -784,31 +790,33 @@ class LmuApp:
             return tk.Label(parent, text=text, background=C_CARD, foreground=kw.pop("fg", C_MUTED),
                             font=kw.pop("font", (FONT, 9)), anchor="w", **kw)
 
-        lbl(left, "Kalkulator paliwa", fg=C_TEXT, font=(FONT, 13, "bold")).pack(anchor="w")
-        lbl(left, "z Twojego realnego zużycia na tym torze", ).pack(anchor="w", pady=(0, 6))
-        self.fu_mode = tk.StringVar(value=self.settings.get("fu_mode", "Kwalifikacje"))
+        lbl(left, "Fuel calculator", fg=C_TEXT, font=(FONT, 13, "bold")).pack(anchor="w")
+        lbl(left, "from your real consumption on this track", ).pack(anchor="w", pady=(0, 6))
+        self.fu_mode = tk.StringVar(value=self._opt("fu_mode", "Qualifying",
+                                                     ("Qualifying", "Race — time", "Race — laps")))
         self.fu_laps = tk.StringVar(value=str(self.settings.get("fu_laps", 3)))
         self.fu_min = tk.StringVar(value=str(self.settings.get("fu_min", 30)))
         self.fu_margin = tk.StringVar(value=str(self.settings.get("fu_margin", 1)))
-        self.fu_rate = tk.StringVar(value=self.settings.get("fu_rate", "maksymalne"))
-        self.fu_src = tk.StringVar(value=self.settings.get("fu_src", "wszystkie sesje na torze"))
+        self.fu_rate = tk.StringVar(value=self._opt("fu_rate", "maximum", ("maximum", "average")))
+        self.fu_src = tk.StringVar(value=self._opt("fu_src", "all sessions on this track",
+                                                    ("all sessions on this track", "this session only")))
         self.fu_inlap = tk.BooleanVar(value=self.settings.get("fu_inlap", True))
         self.fu_form = tk.BooleanVar(value=self.settings.get("fu_form", True))
         form = tk.Frame(left, background=C_CARD)
         form.pack(anchor="w", fill="x")
-        rows = [("Tryb", ttk.Combobox(form, textvariable=self.fu_mode, state="readonly", width=20,
-                                       values=["Kwalifikacje", "Wyścig — czas", "Wyścig — okrążenia"])),
-                ("Okrążenia", ttk.Spinbox(form, from_=1, to=200, width=8,
+        rows = [("Mode", ttk.Combobox(form, textvariable=self.fu_mode, state="readonly", width=20,
+                                       values=["Qualifying", "Race — time", "Race — laps"])),
+                ("Laps", ttk.Spinbox(form, from_=1, to=200, width=8,
                                                                textvariable=self.fu_laps)),
-                ("Czas wyścigu [min]", ttk.Spinbox(form, from_=5, to=1440, increment=5, width=8,
+                ("Race length [min]", ttk.Spinbox(form, from_=5, to=1440, increment=5, width=8,
                                                     textvariable=self.fu_min)),
-                ("Zapas [okrążenia]", ttk.Spinbox(form, from_=0, to=5, increment=0.5, width=8,
+                ("Margin [laps]", ttk.Spinbox(form, from_=0, to=5, increment=0.5, width=8,
                                                    textvariable=self.fu_margin)),
-                ("Zużycie na okrążenie", ttk.Combobox(form, textvariable=self.fu_rate, width=20,
+                ("Consumption per lap", ttk.Combobox(form, textvariable=self.fu_rate, width=20,
                                                       state="readonly",
-                                                      values=["maksymalne", "średnie"])),
-                ("Dane z", ttk.Combobox(form, textvariable=self.fu_src, width=24, state="readonly",
-                                        values=["wszystkie sesje na torze", "tylko ta sesja"]))]
+                                                      values=["maximum", "average"])),
+                ("Data from", ttk.Combobox(form, textvariable=self.fu_src, width=24, state="readonly",
+                                        values=["all sessions on this track", "this session only"]))]
         self.fu_rows = {}
         for r, (label, w) in enumerate(rows):
             lbl(form, label).grid(row=r, column=0, sticky="w", padx=(0, 10), pady=3)
@@ -819,12 +827,12 @@ class LmuApp:
             else:
                 w.configure(command=self._fuel_changed)
                 w.bind("<KeyRelease>", lambda e: self._fuel_changed())
-        for text, var in (("okrążenie zjazdowe (kwalifikacje)", self.fu_inlap),
-                          ("okrążenie formujące (wyścig)", self.fu_form)):
+        for text, var in (("in lap (qualifying)", self.fu_inlap),
+                          ("formation lap (race)", self.fu_form)):
             ttk.Checkbutton(left, text=text, variable=var, style="Card.TCheckbutton",
                             command=self._fuel_changed).pack(anchor="w", pady=(4, 0))
         tk.Frame(left, background=C_LINE, height=1).pack(fill="x", pady=8)
-        lbl(left, "Zatankuj", fg=C_MUTED, font=(FONT, 10)).pack(anchor="w")
+        lbl(left, "Fuel to add", fg=C_MUTED, font=(FONT, 10)).pack(anchor="w")
         self.fu_total = lbl(left, "—", fg=C_ACCENT, font=(FONT, 26, "bold"))
         self.fu_total.pack(anchor="w")
         self.fu_parts = lbl(left, "", justify="left", wraplength=300)
@@ -832,15 +840,15 @@ class LmuApp:
         self.fu_game = lbl(left, "", justify="left", wraplength=300, fg=C_WARN)
         self.fu_game.pack(anchor="w", pady=(8, 0))
         tk.Frame(left, background=C_LINE, height=1).pack(fill="x", pady=8)
-        lbl(left, "Ustaw w grze: setup bazowy").pack(anchor="w")
+        lbl(left, "Set in game: base setup").pack(anchor="w")
         self.fu_base = tk.StringVar()
         self.fu_base_cb = ttk.Combobox(left, textvariable=self.fu_base, width=34, state="readonly")
         self.fu_base_cb.pack(anchor="w", pady=(2, 6))
         self.fu_base_cb.bind("<<ComboboxSelected>>", lambda e: self._fill_fuel_calc())
-        ttk.Button(left, text="Zapisz setup z tym paliwem", style="Accent.TButton",
+        ttk.Button(left, text="Save setup with this fuel", style="Accent.TButton",
                    command=self._write_fuel_setup).pack(anchor="w")
-        self.fu_write = lbl(left, "Zapisze kopię setupu z ustawionym paliwem do folderu setupów "
-                                  "gry — wczytasz ją w garażu (Setup → Load).", justify="left",
+        self.fu_write = lbl(left, "Saves a copy of the setup with this fuel to the game's setup "
+                                  "folder — load it in the garage (Setup → Load).", justify="left",
                             wraplength=300)
         self.fu_write.pack(anchor="w", pady=(6, 0))
         self.fu_bases = {}
@@ -856,11 +864,11 @@ class LmuApp:
         box.pack(fill="both", expand=True)
         cols = ("lap", "kind", "time", "fuel", "ve", "start")
         self.fu_tree = ttk.Treeview(box, columns=cols, show="tree headings", selectmode="browse")
-        self.fu_tree.heading("#0", text="Sesja / stint")
+        self.fu_tree.heading("#0", text="Session / stint")
         self.fu_tree.column("#0", width=230, stretch=False)
-        for c, (text, width) in {"lap": ("Okr.", 50), "kind": ("Rodzaj", 110),
-                                 "time": ("Czas", 80), "fuel": ("Paliwo [L]", 90),
-                                 "ve": ("Energia [%]", 90), "start": ("Na starcie [L]", 100)}.items():
+        for c, (text, width) in {"lap": ("Lap", 50), "kind": ("Type", 110),
+                                 "time": ("Time", 80), "fuel": ("Fuel [L]", 90),
+                                 "ve": ("Energy [%]", 90), "start": ("At start [L]", 100)}.items():
             self.fu_tree.heading(c, text=text)
             self.fu_tree.column(c, width=width, anchor="center")
         self.fu_tree.tag_configure("grp", font=(FONT, 10, "bold"), background=C_GROUP)
@@ -881,7 +889,7 @@ class LmuApp:
         self.save_settings()
 
     def _fuel_stems(self, info):
-        if info["kind"] == "track" or self.fu_src.get() == "wszystkie sesje na torze":
+        if info["kind"] == "track" or self.fu_src.get() == "all sessions on this track":
             track = info["track"]
             stems = self.tracks.get(track, {}).get("stems", [])
         else:
@@ -912,7 +920,7 @@ class LmuApp:
 
             threading.Thread(target=work, daemon=True).start()
         if any(s in self.fu_loading for s in stems):
-            self.fu_info.configure(text="Liczę zużycie paliwa z nagrań…")
+            self.fu_info.configure(text="Calculating fuel use from recordings…")
             return
         self._fill_fuel()
 
@@ -949,7 +957,7 @@ class LmuApp:
             c.destroy()
         laps, used = self._fuel_laps()
         rate = lmu_fuel.rates(laps)
-        kinds = {"out": "wyjazdowe", "fly": "pomiarowe", "in": "zjazdowe"}
+        kinds = {"out": "out lap", "fly": "timed", "in": "in lap"}
         ok_laps = {id(l) for l in laps}
         for s in reversed(used):
             si = self.sessions[s]
@@ -981,23 +989,23 @@ class LmuApp:
                 if st.get("empty_lap") is not None:
                     lp = [l for l in d["laps"] if l["lap"] in st["laps"] and l["kind"] == "fly"]
                     r = lmu_fuel.rates(lp)["avg"]
-                    msg = (f"⚠ {si['session']} {si['dt']:%d.%m}: zabrakło paliwa — {st['end']}. "
-                           f"Start {st['start_fuel']:.1f} L przy zużyciu {r:.2f} L/okr. = paliwo na "
-                           f"{st['start_fuel'] / r:.1f} okr." if r else "")
+                    msg = (f"⚠ {si['session']} {si['dt']:%d.%m}: ran out of fuel — {st['end']}. "
+                           f"Start {st['start_fuel']:.1f} L at {r:.2f} L/lap = fuel for "
+                           f"{st['start_fuel'] / r:.1f} laps." if r else "")
                     if msg:
                         tk.Label(self.fu_stints, text=msg, background="#ffe5e3", foreground=C_ERR,
                                  font=(FONT, 9, "bold"), anchor="w", padx=10, pady=4).pack(fill="x")
         if not laps:
-            self.fu_info.configure(text="Brak Twoich okrążeń z danymi paliwa w tych sesjach.",
+            self.fu_info.configure(text="None of your laps in these sessions have fuel data.",
                                    foreground=C_WARN)
         else:
             self.fu_info.configure(
-                text=f"Zużycie z {rate['n']} okrążeń pomiarowych ({len(used)} sesji, to samo auto): "
-                     f"średnio {rate['avg']:.3f} L/okr., maks. {rate['max']:.3f} L/okr."
-                     + (f", wyjazd z boksu {rate['out']:.2f} L" if rate['out'] else "")
-                     + (f", formujące ≈ {rate['formation']:.2f} L" if rate.get('formation') else "")
-                     + (f"  ·  czas okrążenia ≈ {fmt_lap(rate['lap_time'])}" if rate['lap_time'] else "")
-                     + ".  Szare = wyjazdowe/zjazdowe (nie liczą się do średniej).",
+                text=f"Consumption from {plural(rate['n'], 'timed lap')} ({plural(len(used), 'session')}, same car): "
+                     f"average {rate['avg']:.3f} L/lap, max {rate['max']:.3f} L/lap"
+                     + (f", out lap {rate['out']:.2f} L" if rate['out'] else "")
+                     + (f", formation ≈ {rate['formation']:.2f} L" if rate.get('formation') else "")
+                     + (f"  ·  lap time ≈ {fmt_lap(rate['lap_time'])}" if rate['lap_time'] else "")
+                     + ".  Grey = out/in laps (not counted in the average).",
                 foreground=C_MUTED)
         self._fu_rate = rate
         ve = lmu_fuel.rates(laps, key="ve")
@@ -1023,7 +1031,7 @@ class LmuApp:
             cls = cls or next((v.get("class") for v in si["meta"].get("vehicles") or []
                                if same_driver(v.get("driver"), pl)), None)
             for i, s in enumerate(self._session_setups(st), 1):
-                self.fu_bases[f"z nagrania {si['session']} {si['dt']:%d.%m} #{i} — "
+                self.fu_bases[f"from recording {si['session']} {si['dt']:%d.%m} #{i} — "
                               f"{s.get('name') or '?'}"] = (s["path"], None)
         folder = lmu_setup.track_folder(info["track"]) if info else None
         tok = (cls or "").lower()
@@ -1042,37 +1050,37 @@ class LmuApp:
         total = getattr(self, "_fu_total", None)
         info = self._info()
         if not base or not info:
-            self.fu_write.configure(text="Wybierz setup bazowy.", foreground=C_WARN)
+            self.fu_write.configure(text="Pick a base setup.", foreground=C_WARN)
             return
         src, folder = base
         folder = folder or lmu_setup.track_folder(info["track"])
         if not folder:
-            self.fu_write.configure(text="Nie znalazłem folderu setupów LMU (UserData/player/Settings).",
+            self.fu_write.configure(text="LMU setups folder not found (UserData/player/Settings).",
                                     foreground=C_ERR)
             return
         text = Path(src).read_text(encoding="utf-8", errors="ignore")
         new, desc = lmu_setup.with_fuel(text, liters=total, ve_pct=getattr(self, "_fu_total_ve", None))
         if new is None:
-            self.fu_write.configure(text=f"Nie da się: {desc}.", foreground=C_ERR)
+            self.fu_write.configure(text=f"Not possible: {desc}.", foreground=C_ERR)
             return
         stem = Path(src).stem if folder == Path(src).parent else (
             lmu_setup.identify(lmu_setup.parse(text))[0] or "setup")
-        stem = re.sub(r"\s*-\s*paliwo .*$", "", stem)
-        mode = {"Kwalifikacje": "Q", "Wyścig — czas": "R", "Wyścig — okrążenia": "R"}[self.fu_mode.get()]
+        stem = re.sub(r"\s*-\s*(paliwo|fuel) .*$", "", stem)
+        mode = {"Qualifying": "Q", "Race — time": "R", "Race — laps": "R"}.get(self.fu_mode.get(), "Q")
         tag = f"{desc.split()[-1]}VE" if "%" in desc else "".join(desc.split()[-2:])
-        name = re.sub(r'[<>:"/\|?*]', "", f"{stem} - paliwo {mode} {tag}")
+        name = re.sub(r'[<>:"/\|?*]', "", f"{stem} - fuel {mode} {tag}")
         dest = Path(folder) / f"{name}.svm"
-        if dest.exists() and not messagebox.askyesno("Setup", f"Plik {dest.name} już istnieje. Nadpisać?"):
+        if dest.exists() and not messagebox.askyesno("Setup", f"{dest.name} already exists. Overwrite?"):
             return
         try:
             dest.write_text(new, encoding="utf-8")
         except OSError as e:
-            self.fu_write.configure(text=f"Nie udało się zapisać: {e}", foreground=C_ERR)
+            self.fu_write.configure(text=f"Could not save: {e}", foreground=C_ERR)
             return
-        self.log(f"setup z paliwem: {dest}")
+        self.log(f"setup with fuel: {dest}")
         self.fu_write.configure(
-            text=f"✓ Zapisano „{dest.name}” ({desc}) w Settings/{dest.parent.name}. W grze: "
-                 f"Garaż → Setup → Load i wybierz ten plik.", foreground=C_OK)
+            text=f"✓ Saved “{dest.name}” ({desc}) in Settings/{dest.parent.name}. In the game: "
+                 f"Garage → Setup → Load and pick this file.", foreground=C_OK)
 
     def _game_fuel_estimate(self):
         """L/okr. zakladane przez gre (z zapisanego setupu: 'xx.xL (yy.y laps)')."""
@@ -1092,16 +1100,16 @@ class LmuApp:
     def _fill_fuel_calc(self):
         rate = getattr(self, "_fu_rate", None)
         mode = self.fu_mode.get()
-        q = mode == "Kwalifikacje"
-        self.fu_rows["Czas wyścigu [min]"].configure(state="normal" if mode == "Wyścig — czas" else "disabled")
-        self.fu_rows["Okrążenia"].configure(
-            state="disabled" if mode == "Wyścig — czas" else "normal")
+        q = mode == "Qualifying"
+        self.fu_rows["Race length [min]"].configure(state="normal" if mode == "Race — time" else "disabled")
+        self.fu_rows["Laps"].configure(
+            state="disabled" if mode == "Race — time" else "normal")
         if not rate or not rate.get("avg"):
             self.fu_total.configure(text="—")
-            self.fu_parts.configure(text="Brak danych o zużyciu.")
+            self.fu_parts.configure(text="No consumption data.")
             self.fu_game.configure(text="")
             return
-        per = rate["max"] if self.fu_rate.get() == "maksymalne" else rate["avg"]
+        per = rate["max"] if self.fu_rate.get() == "maximum" else rate["avg"]
 
         def num(v, d):
             try:
@@ -1110,7 +1118,7 @@ class LmuApp:
                 return d
 
         total, parts = lmu_fuel.plan(
-            per, "quali" if q else ("race_time" if mode == "Wyścig — czas" else "race_laps"),
+            per, "quali" if q else ("race_time" if mode == "Race — time" else "race_laps"),
             laps=int(num(self.fu_laps, 3)), minutes=num(self.fu_min, 30),
             lap_time=rate.get("lap_time"), out_lap=rate.get("out"), in_lap=self.fu_inlap.get(),
             in_lap_rate=rate.get("in"), formation=self.fu_form.get(),
@@ -1121,9 +1129,9 @@ class LmuApp:
         ve = getattr(self, "_fu_ve", None) or {}
         self._fu_total_ve = None
         if ve.get("avg"):
-            per_ve = ve["max"] if self.fu_rate.get() == "maksymalne" else ve["avg"]
+            per_ve = ve["max"] if self.fu_rate.get() == "maximum" else ve["avg"]
             tv, _ = lmu_fuel.plan(
-                per_ve, "quali" if q else ("race_time" if mode == "Wyścig — czas" else "race_laps"),
+                per_ve, "quali" if q else ("race_time" if mode == "Race — time" else "race_laps"),
                 laps=int(num(self.fu_laps, 3)), minutes=num(self.fu_min, 30),
                 lap_time=rate.get("lap_time"), out_lap=ve.get("out"), in_lap=self.fu_inlap.get(),
                 in_lap_rate=ve.get("in"), formation=self.fu_form.get(),
@@ -1131,32 +1139,32 @@ class LmuApp:
             self._fu_total_ve = tv
             self.fu_total.configure(text=f"{math.ceil(total * 10) / 10:.1f} L  ·  {math.ceil(tv)}% VE")
         self.fu_parts.configure(text="\n".join(f"{name}: {v:.2f} L" for name, v in parts)
-                                + f"\n(zużycie {per:.3f} L/okr. — {self.fu_rate.get()})")
+                                + f"\n(consumption {per:.3f} L/lap — {self.fu_rate.get()})")
         game = self._game_fuel_estimate()
         if game:
             g = game[0]
             diff = (per - g) / g * 100
             self.fu_game.configure(
-                text=f"Gra w setupie zakłada {g:.3f} L/okr. — realnie zużywasz {per:.3f} "
-                     f"({diff:+.0f}%). Na {total:.0f} L gra pokaże o "
-                     f"{total / g - total / per:.1f} okr. więcej niż faktycznie przejedziesz."
-                if abs(diff) >= 1 else f"Szacunek gry ({g:.3f} L/okr.) zgadza się z Twoim zużyciem.")
+                text=f"The game's setup assumes {g:.3f} L/lap — you actually use {per:.3f} "
+                     f"({diff:+.0f}%). With {total:.0f} L the game will show "
+                     f"{total / g - total / per:.1f} laps more than you will actually drive."
+                if abs(diff) >= 1 else f"The game's estimate ({g:.3f} L/lap) matches your consumption.")
         else:
             self.fu_game.configure(text="")
 
     # ================================================================ prowadzenie
     def _build_tab_handling(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Prowadzenie  ")
+        self.vnb.add(f, text="  Handling  ")
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(0, 6))
-        ttk.Label(bar, text="Porównaj z sesją:", style="Muted.TLabel").pack(side="left")
-        self.hd_cmp = tk.StringVar(value="(nic)")
+        ttk.Label(bar, text="Compare with session:", style="Muted.TLabel").pack(side="left")
+        self.hd_cmp = tk.StringVar(value="(none)")
         self.hd_cmp_cb = ttk.Combobox(bar, textvariable=self.hd_cmp, width=46, state="readonly")
         self.hd_cmp_cb.pack(side="left", padx=(6, 14))
         self.hd_cmp_cb.bind("<<ComboboxSelected>>", lambda e: self._load_handling())
         self.hd_only = tk.BooleanVar(value=False)
-        ttk.Checkbutton(bar, text="tylko fazy z wyraźnym pod-/nadsterowaniem",
+        ttk.Checkbutton(bar, text="only phases with clear under/oversteer",
                         variable=self.hd_only, command=self._fill_handling).pack(side="left")
         self.hd_info = tk.Label(f, background=C_BG, foreground=C_MUTED, anchor="w",
                                 justify="left", font=(FONT, 9))
@@ -1167,15 +1175,15 @@ class LmuApp:
         box.pack(fill="both", expand=True)
         cols = ("bal", "dbal", "vmin", "lat", "front", "lltd", "outs", "rh", "time", "dtime", "hint")
         self.hd_tree = ttk.Treeview(box, columns=cols, show="tree headings", selectmode="browse")
-        self.hd_tree.heading("#0", text="Zakręt / faza")
+        self.hd_tree.heading("#0", text="Corner / phase")
         self.hd_tree.column("#0", width=170, stretch=False)
         for c, (text, width, anchor) in {
-            "bal": ("Balans", 205, "w"), "dbal": ("Δ balans", 78, "center"),
-            "vmin": ("v min", 58, "center"), "lat": ("G bok", 52, "center"),
-            "front": ("Nacisk przód", 86, "center"), "lltd": ("LLTD przód", 78, "center"),
-            "outs": ("Na zewn.", 64, "center"), "rh": ("Min prześwit P/T", 110, "center"),
-            "time": ("Czas", 62, "center"), "dtime": ("Δ czas", 66, "center"),
-            "hint": ("Podpowiedź ustawień", 360, "w")}.items():
+            "bal": ("Balance", 205, "w"), "dbal": ("Δ balance", 78, "center"),
+            "vmin": ("v min", 58, "center"), "lat": ("Lat G", 52, "center"),
+            "front": ("Front load", 86, "center"), "lltd": ("Front LLTD", 78, "center"),
+            "outs": ("Outside", 64, "center"), "rh": ("Min ride height F/R", 110, "center"),
+            "time": ("Time", 62, "center"), "dtime": ("Δ time", 66, "center"),
+            "hint": ("Setup hint", 360, "w")}.items():
             self.hd_tree.heading(c, text=text)
             self.hd_tree.column(c, width=width, anchor=anchor, stretch=c == "hint")
         self.hd_tree.tag_configure("corner", font=(FONT, 10, "bold"), background=C_GROUP)
@@ -1187,13 +1195,13 @@ class LmuApp:
         sb.pack(side="right", fill="y")
         self.hd_tree.bind("<Double-1>", self._hd_double)
         ttk.Label(f, style="Muted.TLabel", wraplength=1150, justify="left",
-                  text="Balans = średni kąt poślizgu opon przód − tył: pomarańczowe = podsterowność "
-                       "(przód ślizga się bardziej), niebieskie = nadsterowność. LLTD przód = jaka "
-                       "część bocznego przenoszenia nacisku idzie na przednią oś (więcej = bardziej "
-                       "podsterowne; zmieniasz stabilizatorami i sprężynami). Δ = ta sesja − "
-                       "porównywana (Δ balans + = bardziej podsterownie, Δ czas + = wolniej). Średnia z 3 "
-                       "najszybszych okrążeń. Dwuklik na zakręcie = pokaż na wykresach. Dane "
-                       "podwozia są tylko z Twojego auta i tylko w nowych nagraniach.").pack(
+                  text="Balance = average tyre slip angle front − rear: orange = understeer "
+                       "(the front slides more), blue = oversteer. Front LLTD = how much "
+                       "of the lateral load transfer goes to the front axle (more = more "
+                       "understeer; tuned with anti-roll bars and springs). Δ = this session − "
+                       "compared one (Δ balance + = more understeer, Δ time + = slower). Average of the 3 "
+                       "fastest laps. Double-click a corner = show on the charts. Chassis "
+                       "data is only from your car and only in new recordings.").pack(
             fill="x", pady=(6, 0))
         self.hd_data = {}
         self.hd_loading = set()
@@ -1255,19 +1263,19 @@ class LmuApp:
                 si = self.sessions[st]
                 self.hd_cmps[f"{si['session']} {si['dt']:%d.%m %H:%M} — "
                              f"{self._used_setup_name(si)}"] = st
-        self.hd_cmp_cb["values"] = ["(nic)"] + list(self.hd_cmps)
+        self.hd_cmp_cb["values"] = ["(none)"] + list(self.hd_cmps)
         if self.hd_cmp.get() not in self.hd_cmps:
-            self.hd_cmp.set("(nic)")
+            self.hd_cmp.set("(none)")
         if not self._chassis_path(stem):
-            self._hd_clear("To nagranie nie ma danych podwozia — zapisuje je dopiero nowa wersja "
-                           "rejestratora (tylko Twoje auto). Nagraj sesję ponownie, a tu pojawi się "
-                           "analiza pod-/nadsterowności i transferu masy w każdym zakręcie.", C_WARN)
+            self._hd_clear("This recording has no chassis data — only the newer recorder "
+                           "writes it (your car only). Record the session again to see "
+                           "under/oversteer and load-transfer analysis for every corner here.", C_WARN)
             return
         a = self._handling_for(stem, None)
         other = self.hd_cmps.get(self.hd_cmp.get())
         b = self._handling_for(other, None) if other else None
         if a == "loading" or b == "loading":
-            self._hd_clear("Liczę prowadzenie auta z danych podwozia…", C_MUTED)
+            self._hd_clear("Calculating handling from chassis data…", C_MUTED)
             return
         self._hd_cur = (a, b)
         self._fill_handling()
@@ -1276,7 +1284,7 @@ class LmuApp:
         sets = self._session_setups(si["stem"])
         et, _ = self._best_lap_et(si)
         used = lmu_setup.setup_for_lap(sets, et)
-        return (used.get("name") or "?") if used else "setup nieznany"
+        return (used.get("name") or "?") if used else "setup unknown"
 
     def _hd_clear(self, msg, color):
         self.hd_tree.delete(*self.hd_tree.get_children())
@@ -1304,13 +1312,13 @@ class LmuApp:
         a, b = cur
         self._hd_clear("", C_MUTED)
         if not a or a.get("error"):
-            self.hd_info.configure(text=(a or {}).get("error", "Brak danych."), foreground=C_WARN)
+            self.hd_info.configure(text=(a or {}).get("error", "No data."), foreground=C_WARN)
             return
         laps = ", ".join(fmt_lap(l["time"]) for l in a["laps"])
-        txt = (f"Średnia z {len(a['laps'])} najszybszych okrążeń ({laps}) z {a['all_laps']} pełnych"
+        txt = (f"Average of the {len(a['laps'])} fastest laps ({laps}) out of {a['all_laps']} complete"
                f"  ·  setup: {self._used_setup_name(info)}")
         if b and not b.get("error"):
-            txt += f"   ⇄ porównanie: {self.hd_cmp.get()}"
+            txt += f"   ⇄ comparison: {self.hd_cmp.get()}"
         self.hd_info.configure(text=txt, foreground=C_MUTED)
         H = lmu_handling
         # karty: balans ogolny, opony, przeswit
@@ -1320,21 +1328,21 @@ class LmuApp:
             v = statistics.fmean(vals) if vals else None
             col = C_TEXT if v is None or abs(v) < H.BAL_TH else ("#c25e00" if v > 0 else C_ACCENT)
             lines.append((f"{lab}: {H.describe_bal(v)}", col))
-        self._hd_card("Balans (średnio)", lines)
+        self._hd_card("Balance (average)", lines)
         ty = a["tyres"]
         tl = []
-        for w, lab in zip(H.WH, ("LP", "PP", "LT", "PT")):
+        for w, lab in zip(H.WH, ("FL", "FR", "RL", "RR")):
             t = ty[w]
             spread = t["t_in"] - t["t_out"]
             tl.append((f"{lab}: {t['t_in']:.0f} / {t['t_mid']:.0f} / {t['t_out']:.0f} °C  ·  "
-                       f"{t['press']:.0f} kPa  ·  camber {t['camber']:.1f}°  (w−z {spread:+.0f})", C_TEXT))
-        self._hd_card("Opony: wewn. / środek / zewn.", tl)
+                       f"{t['press']:.0f} kPa  ·  camber {t['camber']:.1f}°  (in−out {spread:+.0f})", C_TEXT))
+        self._hd_card("Tyres: inner / middle / outer", tl)
         r = a["ride"]
-        self._hd_card("Prześwit", [
-            (f"minimum: przód {r['min_f']:.1f} cm · tył {r['min_r']:.1f} cm", C_TEXT),
-            (f"przy V max: przód {r['fast_f']:.1f} · tył {r['fast_r']:.1f} cm "
+        self._hd_card("Ride height", [
+            (f"minimum: front {r['min_f']:.1f} cm · rear {r['min_r']:.1f} cm", C_TEXT),
+            (f"at top speed: front {r['fast_f']:.1f} · rear {r['fast_r']:.1f} cm "
              f"(rake {r['fast_r'] - r['fast_f']:+.1f})", C_TEXT),
-            (f"dobicia (<0.4 cm): {r['bottom']:.0f} próbek / okr.",
+            (f"bottoming (<0.4 cm): {r['bottom']:.0f} samples / lap",
              C_ERR if r["bottom"] > 5 else C_MUTED)])
         pairs = H.match(a["corners"], b["corners"]) if b and not b.get("error") else {}
         t = self.hd_tree
@@ -1374,10 +1382,10 @@ class LmuApp:
                 t.insert(cid, "end", text=f"   {lab}", values=vals, tags=tag)
 
     def _fill_handling_track(self, info):
-        self._hd_clear("Twoje sesje na tym torze z danymi podwozia — balans średnio na wejściu / "
-                       "środku / wyjściu i setup. Dwuklik = otwórz sesję.", C_MUTED)
-        self.hd_cmp_cb["values"] = ["(nic)"]
-        self.hd_cmp.set("(nic)")
+        self._hd_clear("Your sessions on this track with chassis data — average balance on entry / "
+                       "mid / exit and the setup. Double-click = open the session.", C_MUTED)
+        self.hd_cmp_cb["values"] = ["(none)"]
+        self.hd_cmp.set("(none)")
         t = self.hd_tree
         any_rows = False
         for st in sorted(info["stems"], key=lambda s: self.sessions[s]["dt"], reverse=True):
@@ -1395,12 +1403,12 @@ class LmuApp:
             any_rows = True
             t.insert("", "end", iid=f"S|{st}", text=f"{si['session']} {si['dt']:%d.%m %H:%M}",
                      values=(vals[0], "", "", "", "", "", "", "", "", "",
-                             f"Twój najlepszy {si.get('mine') or '—'}  ·  wejście / środek / "
-                             f"wyjście: {vals[0]} · {vals[1]} · {vals[2]}  ·  "
+                             f"Your best {si.get('mine') or '—'}  ·  entry / mid / "
+                             f"exit: {vals[0]} · {vals[1]} · {vals[2]}  ·  "
                              f"setup: {self._used_setup_name(si)}"))
         if not any_rows:
-            self.hd_info.configure(text="Żadna sesja na tym torze nie ma jeszcze danych podwozia "
-                                        "(nagraj nową sesję).", foreground=C_WARN)
+            self.hd_info.configure(text="No session on this track has chassis data yet "
+                                        "(record a new session).", foreground=C_WARN)
 
     def _hd_double(self, e):
         iid = self.hd_tree.identify_row(e.y)
@@ -1430,16 +1438,16 @@ class LmuApp:
         self.su_pick_cb = ttk.Combobox(bar, textvariable=self.su_pick, width=44, state="readonly")
         self.su_pick_cb.pack(side="left", padx=(6, 14))
         self.su_pick_cb.bind("<<ComboboxSelected>>", lambda e: self._fill_setup())
-        ttk.Label(bar, text="porównaj z:", style="Muted.TLabel").pack(side="left")
-        self.su_cmp = tk.StringVar(value="(nic)")
+        ttk.Label(bar, text="compare with:", style="Muted.TLabel").pack(side="left")
+        self.su_cmp = tk.StringVar(value="(none)")
         self.su_cmp_cb = ttk.Combobox(bar, textvariable=self.su_cmp, width=40, state="readonly")
         self.su_cmp_cb.pack(side="left", padx=(6, 10))
         self.su_cmp_cb.bind("<<ComboboxSelected>>", lambda e: self._fill_setup())
         self.su_only = tk.BooleanVar(value=False)
-        ttk.Checkbutton(bar, text="tylko różnice", variable=self.su_only,
+        ttk.Checkbutton(bar, text="differences only", variable=self.su_only,
                         command=self._fill_setup).pack(side="left")
-        ttk.Button(bar, text="Folder setupów", command=self._open_setup_dir).pack(side="right")
-        ttk.Button(bar, text="Przypisz setup z pliku…",
+        ttk.Button(bar, text="Setups folder", command=self._open_setup_dir).pack(side="right")
+        ttk.Button(bar, text="Assign setup from file…",
                    command=self._assign_setup).pack(side="right", padx=(0, 8))
         self.su_info = tk.Label(f, background=C_BG, foreground=C_MUTED, anchor="w",
                                 justify="left", font=(FONT, 9))
@@ -1448,9 +1456,9 @@ class LmuApp:
         box.pack(fill="both", expand=True)
         self.su_tree = ttk.Treeview(box, columns=("val", "cmp"), show="tree headings",
                                     selectmode="browse")
-        self.su_tree.heading("#0", text="Parametr")
-        self.su_tree.heading("val", text="Ten setup")
-        self.su_tree.heading("cmp", text="Porównanie")
+        self.su_tree.heading("#0", text="Parameter")
+        self.su_tree.heading("val", text="This setup")
+        self.su_tree.heading("cmp", text="Comparison")
         self.su_tree.column("#0", width=260, stretch=False)
         self.su_tree.column("val", width=300, anchor="w")
         self.su_tree.column("cmp", width=300, anchor="w")
@@ -1503,8 +1511,8 @@ class LmuApp:
         used = lmu_setup.setup_for_lap(sets, et)
         pick = None
         for i, s in enumerate(sets, 1):
-            when = "od startu" if s.get("session_et") is None else f"od {s['session_et'] / 60:.0f}. min"
-            star = "  ★ najlepsze okr." if s is used and lap else ""
+            when = "from start" if s.get("session_et") is None else f"from min {s['session_et'] / 60:.0f}"
+            star = "  ★ best lap" if s is used and lap else ""
             lab = f"#{i} {when} — {s.get('name') or self._setup_name(s['path'])}{star}"
             self.su_opts[lab] = s["path"]
             if s is used:
@@ -1524,23 +1532,23 @@ class LmuApp:
         if ps:
             for e in sorted(lmu_setup.library(), key=lambda e: e["name"]):
                 if e["vehicle"] == ps["vehicle"]:
-                    self.su_cmps[f"zapisany: {e['folder']} / {e['name']}"] = Path(e["path"])
-        self.su_cmp_cb["values"] = ["(nic)"] + list(self.su_cmps)
+                    self.su_cmps[f"saved: {e['folder']} / {e['name']}"] = Path(e["path"])
+        self.su_cmp_cb["values"] = ["(none)"] + list(self.su_cmps)
         if self.su_cmp.get() not in self.su_cmps:
-            self.su_cmp.set("(nic)")
+            self.su_cmp.set("(none)")
         if not sets:
             self.su_info.configure(
-                text="To nagranie nie ma zapisanego setupu (nagrane starszą wersją). Nowe nagrania "
-                     "zapisują go same. Możesz przypisać setup ręcznie: „Przypisz setup z pliku…”.",
+                text="This recording has no saved setup (recorded with an older version). New recordings "
+                     "save it automatically. You can assign a setup manually: “Assign setup from file…”.",
                 foreground=C_WARN)
         else:
-            txt = (f"Setup z gry (TempModFile.svm) zapisany przy nagrywaniu · {len(sets)} wersj"
-                   f"{'a' if len(sets) == 1 else 'e'} w tej sesji.")
+            txt = (f"Setup from the game (TempModFile.svm) saved while recording · {len(sets)} version"
+                   f"{'' if len(sets) == 1 else 's'} in this session.")
             if lap:
-                txt += f"  ★ = setup użyty na Twoim najlepszym okrążeniu ({fmt_lap(lap)})."
+                txt += f"  ★ = setup used on your best lap ({fmt_lap(lap)})."
             veh = ps["vehicle"] if ps else ""
             if veh:
-                txt += f"  Auto w setupie: {veh}."
+                txt += f"  Car in setup: {veh}."
             self.su_info.configure(text=txt, foreground=C_MUTED)
         self._fill_setup()
 
@@ -1548,15 +1556,15 @@ class LmuApp:
         t = self.su_tree
         t.delete(*t.get_children())
         t.configure(columns=("val", "cmp"), show="tree headings")
-        t.heading("#0", text="Parametr")
-        t.heading("val", text="Ten setup")
-        t.heading("cmp", text="Porównanie")
+        t.heading("#0", text="Parameter")
+        t.heading("val", text="This setup")
+        t.heading("cmp", text="Comparison")
         path = self.su_opts.get(self.su_pick.get())
         if not path:
             return
         ps = lmu_setup.read(path)
         other = lmu_setup.read(self.su_cmps[self.su_cmp.get()]) if self.su_cmp.get() in self.su_cmps else None
-        t.heading("cmp", text="Porównanie" if not other else self.su_cmp.get()[:48])
+        t.heading("cmp", text="Comparison" if not other else self.su_cmp.get()[:48])
         groups, ndiff = {}, 0
         for grp, lab, val, oval, changed in lmu_setup.rows(ps, other):
             ndiff += changed
@@ -1568,31 +1576,31 @@ class LmuApp:
                      tags=("diff",) if changed else ())
         if other:
             self.su_info.configure(text=self.su_info.cget("text").split("   ⇄")[0]
-                                   + f"   ⇄ różnic: {ndiff}")
+                                   + f"   ⇄ differences: {ndiff}")
 
     def _fill_setup_history(self, info):
         t = self.su_tree
         t.delete(*t.get_children())
         t.configure(columns=("best", "setup"), show="tree headings")
-        t.heading("#0", text="Sesja")
-        t.heading("best", text="Twój najlepszy (pozycja)")
-        t.heading("setup", text="Setup na najlepszym okrążeniu")
+        t.heading("#0", text="Session")
+        t.heading("best", text="Your best (position)")
+        t.heading("setup", text="Setup on the best lap")
         t.column("best", width=200, anchor="center")
         t.column("setup", width=420, anchor="w")
         self.su_pick_cb["values"] = []
         self.su_pick.set("")
-        self.su_cmp_cb["values"] = ["(nic)"]
-        self.su_cmp.set("(nic)")
+        self.su_cmp_cb["values"] = ["(none)"]
+        self.su_cmp.set("(none)")
         for st in sorted(info["stems"], key=lambda s: self.sessions[s]["dt"], reverse=True):
             si = self.sessions[st]
             sets = self._session_setups(st)
             et, _ = self._best_lap_et(si)
             used = lmu_setup.setup_for_lap(sets, et)
-            name = (used.get("name") or self._setup_name(used["path"])) if used else "— brak zapisu"
+            name = (used.get("name") or self._setup_name(used["path"])) if used else "— not saved"
             t.insert("", "end", iid=f"S|{st}", text=f"{si['session']}  ·  {si['dt']:%d.%m %H:%M}",
                      values=(si.get("mine") or "—", name))
-        self.su_info.configure(text="Twoje sesje na tym torze i setup z najlepszego okrążenia. "
-                                    "Dwuklik = otwórz sesję.", foreground=C_MUTED)
+        self.su_info.configure(text="Your sessions on this track and the setup from the best lap. "
+                                    "Double-click = open the session.", foreground=C_MUTED)
 
     def _setup_hist_open(self, e):
         iid = self.su_tree.identify_row(e.y)
@@ -1607,8 +1615,8 @@ class LmuApp:
             return
         folder = lmu_setup.track_folder(info["track"])
         path = filedialog.askopenfilename(
-            title="Wybierz setup użyty w tej sesji", initialdir=str(folder) if folder else None,
-            filetypes=[("Setup LMU", "*.svm"), ("Wszystkie", "*.*")])
+            title="Pick the setup used in this session", initialdir=str(folder) if folder else None,
+            filetypes=[("LMU setup", "*.svm"), ("All files", "*.*")])
         if not path:
             return
         text = Path(path).read_text(encoding="utf-8", errors="ignore")
@@ -1623,7 +1631,7 @@ class LmuApp:
         meta["setups"] = [s for s in (meta.get("setups") or [])] + [entry]
         mpath = info["path"].with_name(info["path"].name[:-7] + ".metadata.json")
         mpath.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
-        self.log(f"setup przypisany: {Path(path).name} -> {info['stem']}")
+        self.log(f"setup assigned: {Path(path).name} -> {info['stem']}")
         self._load_setup()
 
     def _open_setup_dir(self):
@@ -1632,30 +1640,32 @@ class LmuApp:
         if folder:
             self._open_path(folder)
         else:
-            messagebox.showinfo("Setup", "Nie znalazłem folderu LMU (UserData/player/Settings).")
+            messagebox.showinfo("Setup", "LMU folder not found (UserData/player/Settings).")
 
     # ================================================================ klasy i auta
     def _cls_arg(self):
-        return "all" if self.cls_mode.get() == "wszystkie klasy" else "mine"
+        return "all" if self.cls_mode.get() == "all classes" else "mine"
 
     def _build_tab_classes(self):
         f = ttk.Frame(self.vnb, padding=8)
-        self.vnb.add(f, text="  Klasy i auta  ")
+        self.vnb.add(f, text="  Classes & cars  ")
         bar = ttk.Frame(f)
         bar.pack(fill="x", pady=(0, 8))
-        self.cls_group = tk.StringVar(value=self.settings.get("cls_group", "klasa"))
-        self.cls_show = tk.StringVar(value=self.settings.get("cls_show", "wszystkie klasy"))
-        self.cls_ref = tk.StringVar(value=self.settings.get("cls_ref", "lidera klasy"))
-        self.cls_view = tk.StringVar(value=self.settings.get("cls_view", "czas + strata"))
-        if self.cls_group.get() not in ("klasa", "klasa → model auta", "klasa → zespół"):
-            self.cls_group.set("klasa")
-        for label, var, vals, w in (("Grupuj:", self.cls_group,
-                                     ["klasa", "klasa → model auta", "klasa → zespół"], 17),
-                                    ("Pokaż:", self.cls_show, ["wszystkie klasy", "moja klasa"], 14),
-                                    ("Sektory:", self.cls_view,
-                                     ["czas + strata", "tylko strata", "tylko czasy"], 13),
-                                    ("strata do:", self.cls_ref,
-                                     ["mnie (Ty)", "lidera klasy", "najlepszych sektorów klasy"], 24)):
+        self.cls_group = tk.StringVar(value=self.settings.get("cls_group", "class"))
+        self.cls_show = tk.StringVar(value=self._opt("cls_show", "all classes", ("all classes", "my class")))
+        self.cls_ref = tk.StringVar(value=self._opt("cls_ref", "class leader",
+                                                     ("me (you)", "class leader", "class best sectors")))
+        self.cls_view = tk.StringVar(value=self._opt("cls_view", "time + gap",
+                                                      ("time + gap", "gap only", "times only")))
+        if self.cls_group.get() not in ("class", "class → car model", "class → team"):
+            self.cls_group.set("class")
+        for label, var, vals, w in (("Group:", self.cls_group,
+                                     ["class", "class → car model", "class → team"], 17),
+                                    ("Show:", self.cls_show, ["all classes", "my class"], 14),
+                                    ("Sectors:", self.cls_view,
+                                     ["time + gap", "gap only", "times only"], 13),
+                                    ("gap to:", self.cls_ref,
+                                     ["me (you)", "class leader", "class best sectors"], 24)):
             ttk.Label(bar, text=label, style="Muted.TLabel").pack(side="left", padx=(0, 6))
             cb = ttk.Combobox(bar, textvariable=var, values=vals, width=w, state="readonly")
             cb.pack(side="left", padx=(0, 14))
@@ -1669,16 +1679,16 @@ class LmuApp:
         cols = ("pos", "driver", "car", "best", "gap", "pct", "d1", "d2", "d3", "s1", "s2", "s3",
                 "ideal", "laps", "sess")
         self.cls_tree = ttk.Treeview(box, columns=cols, show="tree headings", selectmode="browse")
-        self.cls_tree.heading("#0", text="Klasa / auto")
+        self.cls_tree.heading("#0", text="Class / car")
         self.cls_tree.column("#0", width=190, stretch=False)
         for c, (text, width, anchor) in {
-            "pos": ("#", 34, "center"), "driver": ("Kierowca", 190, "w"),
-            "car": ("Auto / zespół", 210, "w"), "best": ("Najlepszy", 82, "center"),
-            "gap": ("Strata", 70, "center"), "pct": ("%", 54, "center"),
+            "pos": ("#", 34, "center"), "driver": ("Driver", 190, "w"),
+            "car": ("Car / team", 210, "w"), "best": ("Best", 82, "center"),
+            "gap": ("Gap", 70, "center"), "pct": ("%", 54, "center"),
             "d1": ("Δ S1", 74, "center"), "d2": ("Δ S2", 74, "center"), "d3": ("Δ S3", 74, "center"),
             "s1": ("S1", 62, "center"), "s2": ("S2", 62, "center"), "s3": ("S3", 62, "center"),
-            "ideal": ("Idealne", 82, "center"), "laps": ("Okr.", 44, "center"),
-            "sess": ("Sesja", 120, "w")}.items():
+            "ideal": ("Ideal", 82, "center"), "laps": ("Laps", 44, "center"),
+            "sess": ("Session", 120, "w")}.items():
             self.cls_tree.heading(c, text=text)
             self.cls_tree.column(c, width=width, anchor=anchor, stretch=c in ("driver", "car"))
         self.cls_tree.tag_configure("grp", font=(FONT, 10, "bold"), background=C_GROUP)
@@ -1690,11 +1700,11 @@ class LmuApp:
         sb.pack(side="right", fill="y")
         self.cls_tree.bind("<Double-1>", lambda e: self._cls_compare())
         ttk.Label(f, style="Muted.TLabel", wraplength=1100, justify="left",
-                  text="Najlepsze okrążenia wg gry, osobno dla każdej klasy (Hypercar / LMP2 / "
-                       "GT3…). Na wierszu toru: zbiorczo ze wszystkich sesji na tym torze. "
-                       "S1–S3 = sektory najlepszego okrążenia, Idealne = suma najlepszych "
-                       "sektorów. Dwuklik na kierowcy = porównaj z nim na wykresach (jeśli jest "
-                       "w analizie).").pack(fill="x", pady=(6, 0))
+                  text="Best laps according to the game, separately for each class (Hypercar / LMP2 / "
+                       "GT3…). On a track row: aggregated over all sessions on this track. "
+                       "S1–S3 = sectors of the best lap, Ideal = sum of the best "
+                       "sectors. Double-click a driver = compare with them on the charts (if they are "
+                       "in the analysis).").pack(fill="x", pady=(6, 0))
         self.cls_data = {}
         self.cls_loading = set()
 
@@ -1705,7 +1715,7 @@ class LmuApp:
         key = self.current
         if key in self.cls_data:
             return self._fill_classes()
-        self.cls_info.configure(text="Liczę najlepsze czasy…")
+        self.cls_info.configure(text="Calculating best times…")
         if key in self.cls_loading:
             return
         self.cls_loading.add(key)
@@ -1726,7 +1736,7 @@ class LmuApp:
                     if pl:
                         players.add(pl)
                 except Exception as e:
-                    self.q.put(("log", f"klasy: {path.name}: {e}"))
+                    self.q.put(("log", f"classes: {path.name}: {e}"))
             self.q.put(("classes_done", key, lmu_classes.merge(out), players, len(out)))
 
         threading.Thread(target=work, daemon=True).start()
@@ -1756,13 +1766,13 @@ class LmuApp:
             by_cls.setdefault(e.get("cls") or "?", []).append(e)
         my_cls = {e.get("cls") or "?" for e in rows if self._is_me(e, players)}
         order = sorted(by_cls, key=lambda c: (c not in my_cls, lmu_classes.class_rank(c), c))
-        if self.cls_show.get() == "moja klasa" and my_cls:
+        if self.cls_show.get() == "my class" and my_cls:
             order = [c for c in order if c in my_cls]
         fmt_s = lambda v: f"{v:.3f}" if v else ""
         grp = self.cls_group.get()
-        sub = grp != "klasa"
-        to_best = self.cls_ref.get() == "najlepszych sektorów klasy"
-        to_me = self.cls_ref.get() == "mnie (Ty)"
+        sub = grp != "class"
+        to_best = self.cls_ref.get() == "class best sectors"
+        to_me = self.cls_ref.get() == "me (you)"
         KS = ("s1", "s2", "s3")
 
         view = self.cls_view.get()
@@ -1779,7 +1789,7 @@ class LmuApp:
         def sec_cells(e, ref):
             """Kolumny S1-S3: sam czas albo (tryb laczony) czas + strata w nawiasie."""
             times = [fmt_s(e.get(k)) for k in KS]
-            if view != "czas + strata":
+            if view != "time + gap":
                 return times
             ds = sec_deltas(e, ref)
             return [f"{t}  ({d})" if t and d and d != "—" else t for t, d in zip(times, ds)]
@@ -1799,13 +1809,13 @@ class LmuApp:
             card.pack(side="left", padx=(0, 8))
             tk.Label(card, text=lmu_classes.class_label(cls), background=C_CARD, foreground=C_TEXT,
                      font=(FONT, 11, "bold")).pack(anchor="w")
-            tk.Label(card, text=f"{len(arr)} aut · najlepszy {fmt_lap(lead)} "
+            tk.Label(card, text=f"{len(arr)} cars · best {fmt_lap(lead)} "
                                 f"({short_name(arr[0]['driver'], 18)})",
                      background=C_CARD, foreground=C_MUTED, font=(FONT, 9)).pack(anchor="w")
             if me:
                 gap = me[1]["best"] - lead
-                tk.Label(card, text=f"Ty: P{me[0]} · {fmt_lap(me[1]['best'])} · "
-                                    + ("najszybszy w klasie" if gap < 1e-4 else
+                tk.Label(card, text=f"You: P{me[0]} · {fmt_lap(me[1]['best'])} · "
+                                    + ("fastest in class" if gap < 1e-4 else
                                        f"+{gap:.3f} s ({gap / lead * 100:.2f}%)"),
                          background=C_CARD, foreground=C_OK if gap < 1e-4 else C_ACCENT,
                          font=(FONT, 9, "bold")).pack(anchor="w")
@@ -1823,7 +1833,7 @@ class LmuApp:
                                  font=(FONT, 9, "bold" if i == worst and d > 0.05 else "normal")
                                  ).pack(side="left", padx=(0, 10))
                     if e.get("ideal"):
-                        tk.Label(card, text=f"Twoje idealne okrążenie: {fmt_lap(e['ideal'])} "
+                        tk.Label(card, text=f"Your ideal lap: {fmt_lap(e['ideal'])} "
                                             f"({e['ideal'] - e['best']:+.3f})",
                                  background=C_CARD, foreground=C_MUTED, font=(FONT, 9)).pack(anchor="w")
             gid = f"C|{cls}"
@@ -1836,7 +1846,7 @@ class LmuApp:
             if sub:
                 groups = {}
                 for e in arr:
-                    key = (e.get("model") or lmu_classes.team_of(e["vehicle"])) if grp == "klasa → model auta" \
+                    key = (e.get("model") or lmu_classes.team_of(e["vehicle"])) if grp == "class → car model" \
                         else lmu_classes.team_of(e["vehicle"])
                     groups.setdefault(key, []).append(e)
                 for tn, te in sorted(groups.items(), key=lambda kv: kv[1][0]["best"]):
@@ -1857,7 +1867,7 @@ class LmuApp:
                 gap = (base_t - e["best"]) if mine_ref else (e["best"] - lead)
                 mine = self._is_me(e, players)
                 t.insert(parents.get(id(e), gid), "end", tags=("me",) if mine else (),
-                         values=(i, short_name(e["driver"], 28) + ("  (Ty)" if mine else ""),
+                         values=(i, short_name(e["driver"], 28) + ("  (you)" if mine else ""),
                                  e["vehicle"], fmt_lap(e["best"]),
                                  "—" if abs(gap) < 1e-4 else f"{gap:+.3f}",
                                  "" if abs(gap) < 1e-4 else f"{gap / base_t * 100:+.2f}",
@@ -1866,40 +1876,40 @@ class LmuApp:
                                  e.get("session", "")))
         has_sec = any(e.get("s1") or e.get("ideal") for e in rows)
         hide = set() if has_sec else {"d1", "d2", "d3", "s1", "s2", "s3", "ideal"}
-        if view == "czas + strata":
+        if view == "time + gap":
             hide |= {"d1", "d2", "d3"}
-        elif view == "tylko strata":
+        elif view == "gap only":
             hide |= {"s1", "s2", "s3"}
         if nsess <= 1:
             hide.add("sess")
         t.configure(displaycolumns=[c for c in t["columns"] if c not in hide])
-        wide = view == "czas + strata"
+        wide = view == "time + gap"
         for i, k in enumerate(KS, 1):
             t.column(k, width=150 if wide else 62)
-            t.heading(k, text=f"S{i}" + (("  (Ty vs on)" if to_me else "  (strata)") if wide else ""))
+            t.heading(k, text=f"S{i}" + (("  (you vs them)" if to_me else "  (gap)") if wide else ""))
         for i in (1, 2, 3):
-            t.heading(f"d{i}", text=f"Δ S{i}" + (" Ty vs on" if to_me else
-                                                 (" do najl." if to_best else "")))
-        t.heading("gap", text="Ty vs on" if to_me else "Strata")
+            t.heading(f"d{i}", text=f"Δ S{i}" + (" you vs them" if to_me else
+                                                 (" to best" if to_best else "")))
+        t.heading("gap", text="You vs them" if to_me else "Gap")
         t.heading("pct", text="%")
         self.cls_info.configure(
-            text=f"{len(rows)} kierowców · {len(by_cls)} klas(y) · "
-                 + (f"zbiorczo z {nsess} sesji" if nsess > 1 else "1 sesja")
-                 + ("  ·  względem Ciebie: + = tyle tracisz do niego, − = tyle jesteś szybszy"
+            text=f"{len(rows)} drivers · {len(by_cls)} class(es) · "
+                 + (f"aggregated from {nsess} sessions" if nsess > 1 else "1 session")
+                 + ("  ·  relative to you: + = how much you lose to them, − = how much faster you are"
                     if to_me else ""))
 
     def _cls_compare(self):
         sel = self.cls_tree.selection()
         if not sel or not self.view:
             return
-        name = str(self.cls_tree.set(sel[0], "driver")).replace("  (Ty)", "")
+        name = str(self.cls_tree.set(sel[0], "driver")).replace("  (you)", "")
         if not name:
             return
         hit = next((n for n in self.view.drivers
                     if short_name(n, 28) == name or same_driver(n, name)), None)
         if not hit:
-            self.set_status(f"{name} nie jest w tej analizie — zwiększ „max” albo zmień filtr "
-                            f"i analizuj ponownie.")
+            self.set_status(f"{name} is not in this analysis — increase “max” or change the filter "
+                            f"and analyze again.")
             return
         focus, _ = self._compare_pair()
         if hit == focus:
@@ -1934,7 +1944,7 @@ class LmuApp:
             self.body.pack_configure(padx=4, pady=4)
             self.v_body.pack_configure(pady=0)
             self.vnb.configure(style="Full.TNotebook")
-            self.btn_full.configure(text="✕ Zamknij pełny ekran (Esc)")
+            self.btn_full.configure(text="✕ Exit full screen (Esc)")
             self.root.attributes("-fullscreen", True)
         else:
             self.root.attributes("-fullscreen", False)
@@ -1946,7 +1956,7 @@ class LmuApp:
             self.v_top.pack(fill="x", before=self.v_body)
             self.v_body.pack_configure(pady=(8, 0))
             self.vnb.configure(style="TNotebook")
-            self.btn_full.configure(text="⛶ Pełny ekran")
+            self.btn_full.configure(text="⛶ Full screen")
             if getattr(self, "_log_before_full", False) and not self.log_visible:
                 self.toggle_log(save=False)
 
@@ -1985,19 +1995,19 @@ class LmuApp:
         self.log_visible = not self.log_visible
         if self.log_visible:
             self.logf.pack(side="bottom", fill="x")
-            self.btn_log.configure(text="Ukryj log ▴")
+            self.btn_log.configure(text="Hide log ▴")
         else:
             self.logf.pack_forget()
-            self.btn_log.configure(text="Pokaż log ▾")
+            self.btn_log.configure(text="Show log ▾")
         if save:
             self.save_settings()
 
     def log(self, text):
         ts = datetime.now().strftime("%H:%M:%S")
         low = text.lower()
-        tag = "err" if ("błąd" in low or "blad" in low or "traceback" in low
-                        or "error" in low or "nie udało" in low) else ""
-        if "raport gotowy" in low or "zapisane:" in low or text.startswith("[OK]"):
+        tag = "err" if ("error" in low or "traceback" in low or "failed" in low
+                        or "could not" in low) else ""
+        if "report ready" in low or "saved:" in low or text.startswith("[OK]"):
             tag = "ok"
         self.log_text.configure(state="normal")
         self.log_text.insert("end", f"[{ts}] {text}\n", tag)
@@ -2012,11 +2022,11 @@ class LmuApp:
 
     def _update_pill(self):
         if self._recording():
-            self.pill.configure(text="● Nagrywanie", style="PillRec.TLabel")
+            self.pill.configure(text="● Recording", style="PillRec.TLabel")
         elif self.busy:
             self.pill.configure(text="● " + self.busy + "…", style="PillWarn.TLabel")
         else:
-            self.pill.configure(text="● Gotowe", style="PillOk.TLabel")
+            self.pill.configure(text="● Ready", style="PillOk.TLabel")
         if self.busy:
             if not self.progress.winfo_ismapped():
                 self.progress.pack(side="right", padx=(0, 12))
@@ -2130,7 +2140,7 @@ class LmuApp:
             stems = []
             for s in sorted(t["stems"], key=lambda s: self.sessions[s]["dt"], reverse=True):
                 r = self.sessions[s]
-                if sf != "wszystkie" and r["session"] != sf:
+                if sf != "all" and r["session"] != sf:
                     continue
                 if q and q not in track.lower() and not any(
                         q in (v.get("driver") or "").lower()
@@ -2146,29 +2156,29 @@ class LmuApp:
             for s in stems:
                 r = self.sessions[s]
                 tags = ["demo"] if r["demo"] else (["new"] if not r["summary"] else [])
-                label = f"{r['session']} · {r['dt']:%d.%m %H:%M} · {r['cars']} aut"
+                label = f"{r['session']} · {r['dt']:%d.%m %H:%M} · {r['cars']} cars"
                 if r["meta"].get("source") == "lmu_telemetry":
-                    label = f"{r['session']} · {r['dt']:%d.%m %H:%M} · z gry"
+                    label = f"{r['session']} · {r['dt']:%d.%m %H:%M} · from game"
                 self.lib.insert(tid, "end", iid=s, text=label, tags=tags, values=(
                     r["best"], r["mine"], "✓" if r["summary"] else "•"))
                 shown += 1
         missing = sum(1 for r in self.sessions.values() if not r["summary"])
-        self.btn_batch.configure(text=f"Analizuj nowe ({missing})",
+        self.btn_batch.configure(text=f"Analyze new ({missing})",
                                  state="normal" if (missing and not self.busy) else "disabled")
         self._update_import_button()
         if not self.sessions:
-            self.lib_empty.configure(text="Brak nagrań.\n\nKliknij ● Nagrywaj u góry, gdy LMU "
-                                          "działa i jesteś na torze (albo w replayu).")
+            self.lib_empty.configure(text="No recordings.\n\nClick ● Record at the top while LMU "
+                                          "is running and you are on track (or in a replay).")
             self.lib_empty.place(relx=0.5, rely=0.4, anchor="center")
         elif not shown:
-            self.lib_empty.configure(text="Nic nie pasuje do filtra.")
+            self.lib_empty.configure(text="Nothing matches the filter.")
             self.lib_empty.place(relx=0.5, rely=0.4, anchor="center")
         else:
             self.lib_empty.place_forget()
-        extra = f", {self.hidden_small} krótkich ukrytych" if self.hidden_small else ""
-        self.lib_count.configure(text=f"{len(self.sessions)} nagrań, {len(self.tracks)} tor(y)"
-                                      f"{extra}.  Niebieskie = bez analizy.  Wiersz toru = "
-                                      f"analiza ze wszystkich sesji.")
+        extra = f", {self.hidden_small} short ones hidden" if self.hidden_small else ""
+        self.lib_count.configure(text=f"{plural(len(self.sessions), 'recording')}, {plural(len(self.tracks), 'track')}"
+                                      f"{extra}.  Blue = not analyzed.  Track row = "
+                                      f"analysis across all sessions.")
         if sel and self.lib.exists(sel):
             self.lib.selection_set(sel)
 
@@ -2204,7 +2214,7 @@ class LmuApp:
         st = lambda ok: "normal" if ok else "disabled"
         is_sess = info["kind"] == "session"
         self.lib_menu.entryconfigure(0, state=st(not self.busy),
-                                     label="Analizuj ponownie" if info["summary"] else "Analizuj")
+                                     label="Analyze again" if info["summary"] else "Analyze")
         self.lib_menu.entryconfigure(1, state=st((info["outdir"] / "report.html").exists()))
         self.lib_menu.entryconfigure(2, state=st(is_sess and not self.busy))
         self.lib_menu.entryconfigure(4, state=st(is_sess))
@@ -2229,23 +2239,23 @@ class LmuApp:
         info = self._info()
         if not info:
             self.view = None
-            self.v_title.configure(text="Wybierz sesję albo tor z listy")
+            self.v_title.configure(text="Pick a session or a track from the list")
             self.v_sub.configure(text="")
             self.track_opts.pack_forget()
             self._update_actions()
             if self.sessions:
-                self._show_empty("Wybierz sesję albo tor z listy po lewej.")
+                self._show_empty("Pick a session or a track from the list on the left.")
             else:
-                self._show_empty("Nie ma jeszcze nagrań.\n\nUruchom LMU, wjedź na tor (albo "
-                                 "odtwórz replay) i kliknij ● Nagrywaj u góry.")
+                self._show_empty("No recordings yet.\n\nStart LMU, get on track (or "
+                                 "play a replay) and click ● Record at the top.")
             return
         if info["kind"] == "track":
-            self.v_title.configure(text=f"{info['track']}  ·  analiza toru")
-            sub = f"Łączy {len(info['stems'])} nagrań z tego toru: Twoje najlepsze okrążenia vs rywale."
+            self.v_title.configure(text=f"{info['track']}  ·  track analysis")
+            sub = f"Combines {plural(len(info['stems']), 'recording')} from this track: your best laps vs rivals."
             if info["summary"]:
                 when = datetime.fromtimestamp(
                     (info["outdir"] / "summary.json").stat().st_mtime).strftime("%d.%m %H:%M")
-                sub += f"  Ostatnia analiza: {when}."
+                sub += f"  Last analysis: {when}."
             self.v_sub.configure(text=sub)
             self.track_opts.pack(fill="x", pady=(8, 0), before=self.acts)
         else:
@@ -2254,26 +2264,26 @@ class LmuApp:
             self.v_title.configure(text=f"{info['track']}  ·  {info['session']}"
                                         + ("  (DEMO)" if info["demo"] else ""))
             self.v_sub.configure(
-                text=f"{info['dt']:%Y-%m-%d %H:%M}  ·  {info['cars']} aut"
+                text=f"{info['dt']:%Y-%m-%d %H:%M}  ·  {info['cars']} cars"
                      + (f" ({', '.join(classes)})" if classes else "")
-                     + (f"  ·  Ty: {info['player']}" if info["player"] else "")
+                     + (f"  ·  You: {info['player']}" if info["player"] else "")
                      + f"  ·  {info['size']:.1f} MB")
             self.track_opts.pack_forget()
         self._update_actions()
         if not info["summary"]:
             self.view = None
             if info["kind"] == "track":
-                self._show_empty("Ten tor nie ma jeszcze analizy.\n\nUstaw swojego kierowcę i "
-                                 "filtr rywali powyżej, potem kliknij przycisk.",
-                                 "Generuj analizę toru")
+                self._show_empty("This track has no analysis yet.\n\nSet your driver and the "
+                                 "rival filter above, then click the button.",
+                                 "Generate track analysis")
             else:
-                self._show_empty("To nagranie nie jest jeszcze przeanalizowane.", "Analizuj teraz")
+                self._show_empty("This recording is not analyzed yet.", "Analyze now")
             return
         try:
             a = Analysis.load(info["outdir"])
         except Exception as e:
             self.view = None
-            self._show_empty(f"Nie udało się wczytać analizy:\n{e}", "Analizuj ponownie")
+            self._show_empty(f"Could not load the analysis:\n{e}", "Analyze again")
             return
         same = a is self.view
         self.view = a
@@ -2320,7 +2330,7 @@ class LmuApp:
             is_ref = n == a.reference
             self.board.insert("", "end", iid=n, tags=[tag] + (["me"] if mine else []), values=(
                 "☑" if n in sel else "☐", i,
-                ("★ " if is_ref else "") + n + ("   (Ty)" if mine else ""),
+                ("★ " if is_ref else "") + n + ("   (you)" if mine else ""),
                 fmt_lap(d.get("lap_time_s")), fmt_gap(d.get("gap_s")),
                 "ref." if is_ref else fmt_m(d.get("mean_brake_delta_m")),
                 "ref." if is_ref else fmt_m(d.get("mean_pickup_delta_m")),
@@ -2362,7 +2372,7 @@ class LmuApp:
         for c in self.legend.winfo_children():
             c.destroy()
         if a:
-            tk.Label(self.legend, text="Klik = ukryj/pokaż:", background=C_BG,
+            tk.Label(self.legend, text="Click = hide/show:", background=C_BG,
                      foreground=C_MUTED, font=(FONT, 9)).grid(row=0, column=0, padx=(0, 6))
             for i, n in enumerate(a.drivers):
                 on = n in sel
@@ -2462,7 +2472,7 @@ class LmuApp:
                 tags = ["me"] if same_driver(n, me) else []
                 if not d.get("matched", True):
                     self.brk.insert(cid, "end", text=short_name(n, 28), tags=tags + ["miss"],
-                                    values=("brak", "", "", "", "", "", ""))
+                                    values=("none", "", "", "", "", "", ""))
                     continue
                 self.brk.insert(cid, "end", text=short_name(n, 28), tags=tags, values=(
                     num(d.get("brake_start")), fmt_m(d.get("delta_start")),
@@ -2508,7 +2518,7 @@ class LmuApp:
             text = ai_coach.build_brief(info["outdir"], self._player_for(info))
             (info["outdir"] / "ai_brief.md").write_text(text, encoding="utf-8")
         except Exception as e:
-            text = f"Nie udało się zbudować briefu: {e}"
+            text = f"Could not build the brief: {e}"
         self.brief_text = text
         self.brief_for = self.current
         self.brief.configure(state="normal")
@@ -2522,9 +2532,9 @@ class LmuApp:
             return
         self.root.clipboard_clear()
         self.root.clipboard_append(self.brief_text)
-        self.btn_copy.configure(text="✓ Skopiowano")
-        self.root.after(1800, lambda: self.btn_copy.configure(text="Kopiuj do schowka"))
-        self.set_status("Brief skopiowany do schowka.")
+        self.btn_copy.configure(text="✓ Copied")
+        self.root.after(1800, lambda: self.btn_copy.configure(text="Copy to clipboard"))
+        self.set_status("Brief copied to clipboard.")
 
     def save_brief(self):
         self._load_brief()
@@ -2535,7 +2545,7 @@ class LmuApp:
                                          initialfile="ai_brief.md")
         if p:
             Path(p).write_text(self.brief_text, encoding="utf-8")
-            self.set_status(f"Zapisano {p}")
+            self.set_status(f"Saved {p}")
 
     # ================================================================ przyciski akcji
     def _update_actions(self):
@@ -2548,9 +2558,9 @@ class LmuApp:
         is_track = info["kind"] == "track"
         has = bool(info["summary"])
         if is_track:
-            label = "Generuj ponownie" if has else "Generuj analizę toru"
+            label = "Generate again" if has else "Generate track analysis"
         else:
-            label = "Analizuj ponownie" if has else "Analizuj"
+            label = "Analyze again" if has else "Analyze"
         self.btn_analyze.configure(text=label, state="normal" if idle else "disabled")
         self.v_empty_btn.configure(state="normal" if idle else "disabled")
         self.btn_browser.configure(
@@ -2563,7 +2573,7 @@ class LmuApp:
                 self.btn_tp.pack(side="left", padx=(8, 0), before=self.btn_dir)
             who = self._board_driver() or info.get("player")
             self.btn_tp.configure(
-                text=f"TinyPedal: {short_name(who, 18)}" if who else "Eksport do TinyPedal",
+                text=f"TinyPedal: {short_name(who, 18)}" if who else "Export to TinyPedal",
                 state="normal" if (who and idle) else "disabled")
 
     def _board_driver(self):
@@ -2620,7 +2630,7 @@ class LmuApp:
                 rc = p.wait()
                 self.q.put((done_kind, rc, tail, *extra))
             except Exception as e:
-                self.q.put(("log", f"BŁĄD: {e}"))
+                self.q.put(("log", f"ERROR: {e}"))
                 self.q.put((done_kind, 1, [str(e)], *extra))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -2629,7 +2639,7 @@ class LmuApp:
         detail = "\n".join(t for t in tail if t.strip())[-700:]
         if not self.log_visible:
             self.toggle_log()
-        messagebox.showerror(title, "Nie udało się.\n\n" + (detail or "Szczegóły w logu."))
+        messagebox.showerror(title, "Failed.\n\n" + (detail or "Details in the log."))
 
     # ================================================================ analiza sesji
     def analyze_session(self, stem):
@@ -2637,10 +2647,10 @@ class LmuApp:
             return
         info = self.sessions[stem]
         info["outdir"].mkdir(parents=True, exist_ok=True)
-        left = f" (w kolejce: {len(self.batch)})" if self.batch else ""
-        self._set_busy("Analizuję")
-        self.set_status(f"Analizuję {info['track']} / {info['session']}…{left}")
-        self.log(f"analiza: {info['path'].name}")
+        left = f" (queued: {len(self.batch)})" if self.batch else ""
+        self._set_busy("Analyzing")
+        self.set_status(f"Analyzing {info['track']} / {info['session']}…{left}")
+        self.log(f"analysis: {info['path'].name}")
         cmd = [sys.executable, "-u", str(BASE / "analyze.py"), str(info["path"]),
                "--out", str(info["outdir"]), "--top", "8", "--cls", self._cls_arg()]
         self._run(cmd, "analysis_done", stem)
@@ -2651,7 +2661,7 @@ class LmuApp:
             n = len(lmu_gamerec.pending(RECORDS, ANALYSIS / "_imported.json"))
         except Exception:
             n = 0
-        self.btn_import.configure(text=f"Import z gry ({n})" if n else "Import z gry",
+        self.btn_import.configure(text=f"Import from game ({n})" if n else "Import from game",
                                   state="disabled" if self.busy else "normal")
 
     def import_game(self):
@@ -2659,25 +2669,25 @@ class LmuApp:
             return
         if not lmu_gamerec.available():
             messagebox.showinfo(
-                "Import z gry", "Do czytania nagrań gry potrzebna jest biblioteka duckdb.\n\n"
-                                "Zainstaluj ją w terminalu:\n    python -m pip install duckdb\n\n"
-                                "i uruchom aplikację ponownie.")
+                "Import from game", "Reading the game's recordings needs the duckdb library.\n\n"
+                                "Install it in a terminal:\n    python -m pip install duckdb\n\n"
+                                "and restart the app.")
             return
         todo = lmu_gamerec.pending(RECORDS, ANALYSIS / "_imported.json")
         if not todo and lmu_gamerec.in_progress():
             names = ", ".join(p.stem for p in lmu_gamerec.in_progress())
-            messagebox.showinfo("Import z gry", f"Gra jeszcze zapisuje sesję:\n{names}\n\n"
-                                                "Zaimportuj ją po wyjściu z sesji (albo z gry).")
+            messagebox.showinfo("Import from game", f"The game is still writing the session:\n{names}\n\n"
+                                                "Import it after leaving the session (or the game).")
             return
         if not todo:
             d = lmu_gamerec.telemetry_dir()
             messagebox.showinfo(
-                "Import z gry", "Brak nowych nagrań gry do importu.\n\n"
-                                "Włącz w LMU: Ustawienia → Sterowanie → Rozgrywka → Telemetry "
-                                f"Recording, przejedź sesję i kliknij ponownie.\n\nFolder: {d or '?'}")
+                "Import from game", "No new game recordings to import.\n\n"
+                                "Turn on in LMU: Settings → Controls → Gameplay → Telemetry "
+                                f"Recording, drive a session and click again.\n\nFolder: {d or '?'}")
             return
-        self._set_busy("Import z gry")
-        self.set_status(f"Importuję {len(todo)} nagrań gry…")
+        self._set_busy("Importing from game")
+        self.set_status(f"Importing {len(todo)} game recordings…")
         player = self.player_var.get().strip() or None
 
         def work():
@@ -2685,7 +2695,7 @@ class LmuApp:
                 stems = lmu_gamerec.import_all(RECORDS, ANALYSIS, player,
                                                log=lambda m: self.q.put(("log", m)))
             except Exception as e:
-                self.q.put(("log", f"import z gry: {type(e).__name__}: {e}"))
+                self.q.put(("log", f"import from game: {type(e).__name__}: {e}"))
                 stems = []
             self.q.put(("import_done", stems))
 
@@ -2694,8 +2704,8 @@ class LmuApp:
     def _import_done(self, stems):
         self._set_busy(None)
         self.refresh_library(select=stems[0] if stems else None)
-        self.set_status(f"Zaimportowano {len(stems)} nagrań gry." if stems else
-                        "Import z gry: nic nie zaimportowano (szczegóły w logu).")
+        self.set_status(f"Imported {len(stems)} game recordings." if stems else
+                        "Import from game: nothing imported (details in the log).")
         if stems and self.auto_analyze_var.get():
             self.batch = stems[1:]
             self.analyze_session(stems[0])
@@ -2707,8 +2717,8 @@ class LmuApp:
         if not todo:
             return
         if len(todo) > 1 and not messagebox.askyesno(
-                "Analiza", f"Przeanalizować {len(todo)} nagrań bez analizy?\n"
-                           "Może to potrwać kilka minut."):
+                "Analysis", f"Analyze {len(todo)} recordings without an analysis?\n"
+                           "This may take a few minutes."):
             return
         self.batch = todo[1:]
         self.analyze_session(todo[0])
@@ -2716,7 +2726,7 @@ class LmuApp:
     def _analysis_done(self, rc, tail, stem):
         self._set_busy(None)
         ok = rc == 0 and (ANALYSIS / stem / "summary.json").exists()
-        self.log(f"raport gotowy: {stem}" if ok else f"analiza nie powiodła się: {stem}")
+        self.log(f"report ready: {stem}" if ok else f"analysis failed: {stem}")
         self.view_sel.pop(str(ANALYSIS / stem), None)
         if self.batch:
             nxt = self.batch.pop(0)
@@ -2725,10 +2735,10 @@ class LmuApp:
             return
         self.refresh_library(select=stem)
         if ok:
-            self.set_status("Analiza gotowa.")
+            self.set_status("Analysis ready.")
         else:
-            self.set_status("Analiza nie powiodła się.")
-            self._fail("Analiza sesji", tail)
+            self.set_status("Analysis failed.")
+            self._fail("Session analysis", tail)
 
     # ================================================================ TinyPedal
     def export_tinypedal(self):
@@ -2740,8 +2750,8 @@ class LmuApp:
                "--out", str(TINYPEDAL)]
         if who:
             cmd += ["--driver", who]
-        self._set_busy("Eksport TinyPedal")
-        self.set_status(f"Eksport okrążenia: {who}…")
+        self._set_busy("TinyPedal export")
+        self.set_status(f"Exporting lap: {who}…")
         self.log(f"TinyPedal: {info['path'].name} | {who}")
         self._run(cmd, "tp_done", who)
 
@@ -2749,13 +2759,13 @@ class LmuApp:
         self._set_busy(None)
         ok_lines = [t for t in tail if t.startswith("[OK]")]
         if rc == 0 and ok_lines:
-            self.set_status(f"Zapisano okrążenie {who} do tinypedal_laps.")
+            self.set_status(f"Saved the lap of {who} to tinypedal_laps.")
             if messagebox.askyesno(
-                    "TinyPedal", ok_lines[-1][5:] + "\n\nPlik zapisany w tinypedal_laps/.\n"
-                    "W TinyPedal: Tools → Best Lap Manager → Import.\n\nOtworzyć folder?"):
+                    "TinyPedal", ok_lines[-1][5:] + "\n\nFile saved in tinypedal_laps/.\n"
+                    "In TinyPedal: Tools → Best Lap Manager → Import.\n\nOpen the folder?"):
                 self._open_path(TINYPEDAL)
         else:
-            self.set_status("Eksport do TinyPedal nie powiódł się.")
+            self.set_status("TinyPedal export failed.")
             self._fail("TinyPedal", tail)
 
     # ================================================================ analiza toru
@@ -2766,7 +2776,7 @@ class LmuApp:
         track = info["track"]
         player = self.player_var.get().strip()
         if not player:
-            messagebox.showinfo("Analiza toru", "Wpisz albo wybierz swojego kierowcę (pole „Ja”).")
+            messagebox.showinfo("Track analysis", "Type or pick your driver (the “Me” field).")
             return
         fkey = dict(FILTERS).get(self.filter_var.get(), "faster_or_sector")
         plap = max(1, min(3, int(self.player_lap_var.get() or 1)))
@@ -2776,9 +2786,9 @@ class LmuApp:
                "--top", str(top), "--player-lap", str(plap), "--out", str(info["outdir"]),
                "--cls", self._cls_arg()]
         self.save_settings()
-        self._set_busy("Analizuję tor")
-        self.set_status(f"Analiza toru {track} ({len(info['stems'])} nagrań)…")
-        self.log(f"analiza toru: {track} | {player} | {fkey} | lap#{plap} | top={top}")
+        self._set_busy("Analyzing track")
+        self.set_status(f"Track analysis {track} ({plural(len(info['stems']), 'recording')})…")
+        self.log(f"track analysis: {track} | {player} | {fkey} | lap#{plap} | top={top}")
         self._run(cmd, "track_done", "T|" + track)
 
     def _track_done(self, rc, tail, iid):
@@ -2787,11 +2797,11 @@ class LmuApp:
         self.refresh_library(select=iid)
         info = self._info(iid)
         if rc == 0 and info and info["summary"]:
-            self.set_status("Analiza toru gotowa.")
-            self.log("raport gotowy: analiza toru")
+            self.set_status("Track analysis ready.")
+            self.log("report ready: track analysis")
         else:
-            self.set_status("Analiza toru nie powiodła się.")
-            self._fail("Analiza toru", tail)
+            self.set_status("Track analysis failed.")
+            self._fail("Track analysis", tail)
 
     # ================================================================ nagrywanie
     def toggle_recording(self):
@@ -2817,18 +2827,18 @@ class LmuApp:
                 env=CHILD_ENV, creationflags=NO_WINDOW)
         except Exception as e:
             self.rec_proc = None
-            messagebox.showerror("Nagrywanie", f"Nie udało się uruchomić: {e}")
+            messagebox.showerror("Recording", f"Could not start: {e}")
             return
         self.rec_started = time.time()
         self.rec_error = None
         self.last_saved = None
         self.btn_rec.configure(text="■  Stop", style="Stop.TButton")
         self.rec_timer.configure(text="0:00:00", foreground=C_REC)
-        self.rec_state.configure(text="Łączę z LMU…", foreground=C_WARN)
-        self.rec_hint.configure(text="Czekam na dane z gry (musisz być na torze albo w replayu).")
+        self.rec_state.configure(text="Connecting to LMU…", foreground=C_WARN)
+        self.rec_hint.configure(text="Waiting for data from the game (you must be on track or in a replay).")
         self.btn_probe.configure(state="disabled")
-        self.set_status("Nagrywanie…")
-        self.log("start nagrywania")
+        self.set_status("Recording…")
+        self.log("recording started")
         self._update_pill()
 
         def reader(proc):
@@ -2853,32 +2863,32 @@ class LmuApp:
                 best = "—"
             who = f" ({short_name(m['who'], 20)})" if m["who"] else ""
             rows = f"{int(m['rows']):,}".replace(",", " ")
-            self.rec_state.configure(text=f"Nagrywa:  {m['track']}  ·  {m['session']}",
+            self.rec_state.configure(text=f"Recording:  {m['track']}  ·  {m['session']}",
                                      foreground=C_REC)
-            self.rec_hint.configure(text=f"{m['cars']} aut   ·   najlepszy {best}{who}   ·   "
-                                         f"{rows} próbek   ·   {m['mb']} MB")
-        elif "podlaczono do LMU_Data" in line:
-            self.rec_state.configure(text="Połączono — czekam na auta", foreground=C_WARN)
-            self.rec_hint.configure(text="Jeśli to trwa: wejdź na tor / uruchom replay "
-                                         "(menu i garaż nie dają danych).")
-        elif "czekam: telemetria pusta" in line:
+            self.rec_hint.configure(text=f"{m['cars']} cars   ·   best {best}{who}   ·   "
+                                         f"{rows} samples   ·   {m['mb']} MB")
+        elif "connected to LMU_Data" in line:
+            self.rec_state.configure(text="Connected — waiting for cars", foreground=C_WARN)
+            self.rec_hint.configure(text="If this takes long: get on track / start a replay "
+                                         "(menus and the garage give no data).")
+        elif "waiting: telemetry empty" in line:
             replay = "3" in line.split("ctrl=")[1].split(",")[0] if "ctrl=" in line else False
             frozen = "ET=0.0)" in line
-            self.rec_state.configure(text="Połączono — gra nie wysyła danych aut", foreground=C_WARN)
+            self.rec_state.configure(text="Connected — the game sends no car data", foreground=C_WARN)
             if replay:
                 self.rec_hint.configure(
-                    text="Replay: lista aut jest, ale telemetria pusta"
-                         + (" i zegar stoi" if frozen else "")
-                         + ". Puść replay (play, nie pauza) w widoku z torem.")
+                    text="Replay: the car list is there, but telemetry is empty"
+                         + (" and the clock is stopped" if frozen else "")
+                         + ". Play the replay (play, not pause) in a view showing the track.")
             else:
-                self.rec_hint.configure(text="Wejdź na tor / uruchom replay "
-                                             "(menu i garaż nie dają danych).")
-        elif "zapisane:" in line:
-            self.last_saved = Path(line.split("zapisane:", 1)[1].split(" (")[0].strip())
-        elif "BLAD" in line:
+                self.rec_hint.configure(text="Get on track / start a replay "
+                                             "(menus and the garage give no data).")
+        elif "[REC] saved:" in line:
+            self.last_saved = Path(line.split("saved:", 1)[1].split(" (")[0].strip())
+        elif "[REC] ERROR" in line:
             self.rec_error = line
-            self.rec_state.configure(text="Brak połączenia z LMU", foreground=C_ERR)
-            self.rec_hint.configure(text="Uruchom LMU i włącz Settings → Gameplay → "
+            self.rec_state.configure(text="No connection to LMU", foreground=C_ERR)
+            self.rec_hint.configure(text="Start LMU and turn on Settings → Gameplay → "
                                          "Enable external plugins.")
 
     def _tick(self):
@@ -2892,54 +2902,54 @@ class LmuApp:
         try:
             STOP_FILE.write_text("", encoding="utf-8")
         except Exception as e:
-            self.log(f"nie mogę zapisać stop-file: {e}")
+            self.log(f"could not write the stop file: {e}")
         self.btn_rec.configure(state="disabled")
-        self.rec_state.configure(text="Zatrzymuję i zapisuję…", foreground=C_WARN)
-        self.set_status("Zatrzymuję nagrywanie…")
+        self.rec_state.configure(text="Stopping and saving…", foreground=C_WARN)
+        self.set_status("Stopping the recording…")
 
     def _rec_done(self, rc):
         self.rec_proc = None
-        self.btn_rec.configure(text="●  Nagrywaj", style="Rec.TButton", state="normal")
+        self.btn_rec.configure(text="●  Record", style="Rec.TButton", state="normal")
         self.rec_timer.configure(foreground=C_MUTED)
         self.btn_probe.configure(state="disabled" if self.busy else "normal")
-        self.log(f"nagrywanie zakończone (rc={rc})")
+        self.log(f"recording finished (rc={rc})")
         self._update_pill()
         saved = self.last_saved if self.last_saved and self.last_saved.exists() else None
         stem = saved.name[:-7] if saved else None
         self.refresh_library(select=stem)
         if self.rec_error:
-            self.set_status("Nie udało się połączyć z LMU.")
+            self.set_status("Could not connect to LMU.")
             return
-        self.rec_state.configure(text="Nagranie zakończone", foreground=C_OK)
+        self.rec_state.configure(text="Recording finished", foreground=C_OK)
         if not saved:
-            self.rec_hint.configure(text="Nic nie zapisano (brak aut na torze).")
-            self.set_status("Nagrywanie zakończone — brak danych.")
+            self.rec_hint.configure(text="Nothing saved (no cars on track).")
+            self.set_status("Recording finished — no data.")
             return
         size = saved.stat().st_size / 1e6
         if stem not in self.sessions:
-            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — za krótkie do analizy.")
+            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — too short to analyze.")
         elif self.auto_analyze_var.get():
-            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — analizuję, wynik "
-                                         f"pojawi się po prawej.")
+            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — analyzing, the result "
+                                         f"will appear on the right.")
             self.analyze_session(stem)
         else:
-            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — zaznaczone na liście.")
-        self.set_status("Nagrywanie zakończone.")
+            self.rec_hint.configure(text=f"{saved.name} ({size:.1f} MB) — selected in the list.")
+        self.set_status("Recording finished.")
 
     def run_probe(self):
         if self.busy or self._recording():
             return
         if not self.log_visible:
             self.toggle_log()
-        self._set_busy("Test połączenia")
-        self.set_status("Test połączenia z LMU (10 s)…")
+        self._set_busy("Connection test")
+        self.set_status("Testing the connection to LMU (10 s)…")
         self._run([sys.executable, "-u", str(BASE / "record.py"), "--probe-seconds", "10"],
                   "probe_done")
 
     def _probe_done(self, rc, tail):
         self._set_busy(None)
-        self.set_status("Test zakończony — wynik w logu." if rc == 0
-                        else "Brak połączenia z LMU (szczegóły w logu).")
+        self.set_status("Test finished — result in the log." if rc == 0
+                        else "No connection to LMU (details in the log).")
 
     # ================================================================ petla
     def _poll_queue(self):
@@ -2972,14 +2982,14 @@ class LmuApp:
         except queue.Empty:
             pass
         except Exception:
-            # blad w obsludze jednego zdarzenia nie moze zatrzymac petli (koniec logu, nagrywania)
-            self.log("BŁĄD: " + traceback.format_exc().strip().splitlines()[-1])
+            # an error in one handler must not stop the loop (log, recording status)
+            self.log("ERROR: " + traceback.format_exc().strip().splitlines()[-1])
         self.root.after(120, self._poll_queue)
 
     def on_close(self):
         if self._recording():
-            if not messagebox.askyesno("Nagrywanie", "Nagrywanie trwa. Zatrzymać, zapisać "
-                                                     "i zamknąć?"):
+            if not messagebox.askyesno("Recording", "Recording is in progress. Stop, save "
+                                                     "and close?"):
                 return
             self.stop_recording()
             try:
@@ -3011,7 +3021,7 @@ if __name__ == "__main__":
         err = BASE / "lmu_app_error.log"
         err.write_text(traceback.format_exc(), encoding="utf-8")
         try:
-            messagebox.showerror("LMU Telemetry", f"Błąd aplikacji.\nSzczegóły: {err}")
+            messagebox.showerror("LMU Telemetry", f"Application error.\nDetails: {err}")
         except Exception:
             pass
         raise

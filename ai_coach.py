@@ -44,7 +44,7 @@ def find_driver(name, names):
 def build_brief(analysis_dir: Path, driver: str | None = None) -> str:
     summary_path = analysis_dir / "summary.json"
     if not summary_path.exists():
-        raise FileNotFoundError(f"Brak {summary_path} — najpierw uruchom analyze.py")
+        raise FileNotFoundError(f"Missing {summary_path} — run analyze.py first")
     s = json.load(open(summary_path, encoding="utf-8"))
     ref = s.get("reference", "")
     drivers = s.get("drivers", [])
@@ -53,18 +53,18 @@ def build_brief(analysis_dir: Path, driver: str | None = None) -> str:
     focus = find_driver(driver, names) if driver else None
 
     lines = []
-    lines.append("# Brief AI — analiza telemetrii LMU")
+    lines.append("# AI brief — LMU telemetry analysis")
     lines.append("")
-    lines.append(f"- Tor: **{s.get('track','?')}**")
-    lines.append(f"- Sesja: **{s.get('session','?')}**")
-    lines.append(f"- Długość toru: **{s.get('track_length_m',0):.0f} m**")
-    lines.append(f"- Referencja: **{ref}** (najszybsze okrążenie)")
+    lines.append(f"- Track: **{s.get('track','?')}**")
+    lines.append(f"- Session: **{s.get('session','?')}**")
+    lines.append(f"- Track length: **{s.get('track_length_m',0):.0f} m**")
+    lines.append(f"- Reference: **{ref}** (fastest lap)")
     if focus:
-        lines.append(f"- Analizowany kierowca: **{focus}**")
+        lines.append(f"- Driver analysed: **{focus}**")
     lines.append("")
-    lines.append("## Czasy okrążeń")
+    lines.append("## Lap times")
     lines.append("")
-    lines.append("| # | Kierowca | Czas | Strata | Śr. Δ hamowania | Śr. Δ gazu |")
+    lines.append("| # | Driver | Time | Gap | Avg Δ braking | Avg Δ throttle |")
     lines.append("|---:|---|---:|---:|---:|---:|")
     for i, d in enumerate(drivers, 1):
         name = f"**{d['name']}**" if d["name"] == focus else d["name"]
@@ -75,20 +75,20 @@ def build_brief(analysis_dir: Path, driver: str | None = None) -> str:
             f"{fmt(d.get('mean_pickup_delta_m'), 1, ' m')} |"
         )
     lines.append("")
-    lines.append("Δ hamowania: ujemna = hamuje **wcześniej** (mniejszy dystans), dodatnia = później.")
-    lines.append("Δ gazu: ujemna = wcześniej wciska gaz. Dane rywali w LMU odświeżają się "
-                 "~5 Hz (0,2 s), więc delty < 10–15 m są przybliżone.")
+    lines.append("Δ braking: negative = brakes **earlier** (shorter distance), positive = later.")
+    lines.append("Δ throttle: negative = gets on the throttle earlier. Rival data in LMU refreshes at "
+                 "~5 Hz (0.2 s), so deltas < 10–15 m are approximate.")
     lines.append("")
 
-    lines.append("## Strefy hamowania")
+    lines.append("## Braking zones")
     lines.append("")
     for c in braking:
-        lines.append(f"### {c['corner']} — start referencji @ {c['ref_start']:.0f} m")
+        lines.append(f"### {c['corner']} — reference start @ {c['ref_start']:.0f} m")
         rows = c.get("drivers", [])
         refrow = next((r for r in rows if r.get("name") == ref), None)
         ref_vmin = refrow.get("min_speed_kmh") if refrow else None
         lines.append("")
-        lines.append("| Kierowca | Hamowanie [m] | Δ ham. [m] | Koniec [m] | Gaz [m] | Δ gazu [m] | Vmin [km/h] | Δ Vmin | Max ham. |")
+        lines.append("| Driver | Braking [m] | Δ brake [m] | End [m] | Throttle [m] | Δ throttle [m] | Vmin [km/h] | Δ Vmin | Max brake |")
         lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|")
         for r in rows:
             if not r.get("matched"):
@@ -124,42 +124,42 @@ def build_brief(analysis_dir: Path, driver: str | None = None) -> str:
                            fr.get("delta_pickup")))
         losses.sort(reverse=True)
         if losses:
-            lines.append("## Największe różnice względem referencji (wstępna selekcja)")
+            lines.append("## Biggest differences to the reference (pre-selection)")
             lines.append("")
             for _, corner, dist, ds, dv, dp in losses[:5]:
                 lines.append(
-                    f"- **{corner}** @ {dist:.0f} m: Δ hamowania {fmt(ds, 1)} m, "
-                    f"Δ Vmin {fmt(dv, 1)} km/h, Δ gazu {fmt(dp, 1)} m"
+                    f"- **{corner}** @ {dist:.0f} m: Δ braking {fmt(ds, 1)} m, "
+                    f"Δ Vmin {fmt(dv, 1)} km/h, Δ throttle {fmt(dp, 1)} m"
                 )
             lines.append("")
 
-    lines.append("## Zadanie dla AI")
+    lines.append("## Task for the AI")
     lines.append("")
-    lines.append("Jesteś doświadczonym inżynierem wyścigowym analizującym telemetrię LMP2 w Le Mans Ultimate.")
-    lines.append("Na podstawie **tylko powyższych danych**:")
-    lines.append("1. Wskaż maksymalnie 5 konkretnych miejsc/strat czasu (zakręt, dystans, objaw).")
-    lines.append("2. Dla każdego podaj najbardziej prawdopodobny mechanizm (za wczesne/za późne hamowanie, "
-                 "za niska Vmin, za późny powrót na gaz, zbyt agresywne wejście itd.).")
-    lines.append("3. Zaproponuj 2–3 konkretne ćwiczenia lub zmiany dla analizowanego kierowcy.")
-    lines.append("4. Oddziel wnioski pewne od niepewnych; pamiętaj, że dane rywali są ~5 Hz, "
-                 "więc różnice < 10–15 m mogą być szumem.")
-    lines.append("5. Nie wymyślaj liczb ani zakrętów spoza tabel. Jeśli brakuje danych — napisz to.")
+    lines.append("You are an experienced race engineer analysing LMP2 telemetry in Le Mans Ultimate.")
+    lines.append("Based **only on the data above**:")
+    lines.append("1. Point out at most 5 specific places/time losses (corner, distance, symptom).")
+    lines.append("2. For each, give the most likely mechanism (braking too early/too late, "
+                 "Vmin too low, back on the throttle too late, too aggressive an entry, etc.).")
+    lines.append("3. Suggest 2–3 concrete exercises or changes for the driver being analysed.")
+    lines.append("4. Separate certain conclusions from uncertain ones; remember rival data is ~5 Hz, "
+                 "so differences < 10–15 m may be noise.")
+    lines.append("5. Do not invent numbers or corners that are not in the tables. If data is missing, say so.")
     lines.append("")
-    lines.append("Dodatkowe pliki: `traces.csv` (pełne przebiegi co 2 m), `braking.csv`, `best_laps.csv`.")
+    lines.append("Extra files: `traces.csv` (full traces every 2 m), `braking.csv`, `best_laps.csv`.")
     return "\n".join(lines) + "\n"
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Brief telemetrii dla AI")
-    ap.add_argument("analysis_dir", help="katalog z summary.json (wynik analyze.py)")
-    ap.add_argument("--driver", default=None, help="kierowca do analizy (np. Marek)")
-    ap.add_argument("--out", default=None, help="sciezka wyjsciowa (domyslnie ai_brief.md)")
+    ap = argparse.ArgumentParser(description="Telemetry brief for an AI")
+    ap.add_argument("analysis_dir", help="folder with summary.json (output of analyze.py)")
+    ap.add_argument("--driver", default=None, help="driver to analyse (e.g. Marek)")
+    ap.add_argument("--out", default=None, help="output path (default ai_brief.md)")
     args = ap.parse_args(argv)
     d = Path(args.analysis_dir)
     text = build_brief(d, args.driver)
     out = Path(args.out) if args.out else d / "ai_brief.md"
     out.write_text(text, encoding="utf-8")
-    print(f"zapisano: {out}")
+    print(f"saved: {out}")
     return 0
 
 

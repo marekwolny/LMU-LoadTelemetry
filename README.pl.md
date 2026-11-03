@@ -2,6 +2,10 @@
 
 [English](README.md) · **Polski**
 
+> **Uwaga:** interfejs aplikacji, raport HTML i brief AI są teraz po angielsku. Nazwy
+> przycisków i zakładek w tym opisie pochodzą z wcześniejszej, polskiej wersji — aktualne
+> nazwy są w [README po angielsku](README.md).
+
 ## 0. Aplikacja offline (najprościej)
 
 Kliknij dwuklikiem **`START_LMU_TELEMETRY.cmd`** (albo `pythonw lmu_app.py`).
