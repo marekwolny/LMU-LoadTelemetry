@@ -105,6 +105,7 @@ def scan_laps(paths):
     lap_states = {}
     candidates = []
     max_d = defaultdict(float)
+    cls_of = {}
     min_best = defaultdict(lambda: 1e9)
 
     for path in paths:
@@ -132,6 +133,8 @@ def scan_laps(paths):
                 b = fnum(row.get("best_lap"), 0)
                 if b and 0 < b < 1e8:
                     min_best[drv] = min(min_best[drv], b)
+                if row.get("car_class"):
+                    cls_of[drv] = row["car_class"]
                 if start <= 0 or d < 0:
                     continue
 
@@ -176,6 +179,9 @@ def scan_laps(paths):
                 "last_et": st.last_et, "samples": st.n, "file": "",
                 "start_fallback": False,
             })
+    # klasa z wierszy (metadane maja liste aut z chwili startu nagrania - bez spoznionych)
+    for c in candidates:
+        c["cls"] = cls_of.get(c["driver"], "")
     return candidates, max_d, min_best
 
 
@@ -628,10 +634,13 @@ def main(argv=None):
         for v in meta_for(p).get("vehicles") or []:
             if v.get("driver"):
                 cmap.setdefault(v["driver"], v.get("class") or "")
+    for c in candidates:
+        if c.get("cls"):
+            cmap.setdefault(c["driver"], c["cls"])
+    pl = next((meta_for(p).get("player") for p in paths if meta_for(p).get("player")), None)
     if args.cls and args.cls != "all":
         want = args.cls
         if want == "mine":
-            pl = next((meta_for(p).get("player") for p in paths if meta_for(p).get("player")), None)
             want = cmap.get(pl)
         only = [c for c in best_sorted if cmap.get(c["driver"]) == want] if want else []
         if only:
@@ -657,6 +666,21 @@ def main(argv=None):
         selected.append(c)
         if len(selected) >= top_n:
             break
+    # gracz zawsze w raporcie, nawet spoza top N (duze serwery: 60 aut)
+    if pl and not any(c["driver_csv"] == pl for c in selected):
+        mine = sorted((c for c in best_by_key.values() if c["driver"] == pl),
+                      key=lambda c: c["duration"])
+        if mine:
+            c = dict(mine[0])
+            c["display"] = c["driver_csv"] = pl
+            # prawdziwa pozycja (w klasie, jesli filtr klasy), a nie 9. w raporcie
+            c["position"] = next((i for i, x in enumerate(best_sorted, 1) if x["driver"] == pl),
+                                 None)
+            official = min_best.get(pl)
+            if official and 0 < official < 1e8:
+                c["official_lap_time"] = official
+            selected.append(c)
+            print(f"[ANALYSIS] adding your lap ({fmt_lap(c['duration'])}) from outside the top {top_n}")
 
     # pass 2: probki dla najlepszego i drugiego okrazenia kazdego wybranego
     target_laps = defaultdict(list)
@@ -699,6 +723,7 @@ def main(argv=None):
             "name": name,
             "vehicle": c["vehicle"],
             "cls": cmap.get(c["driver_csv"], ""),
+            "position": c.get("position"),
             "car_id": c["car_id"],
             "lap": tc["lap"],
             "lap_number": tc["lap"],
@@ -789,6 +814,7 @@ def main(argv=None):
         "drivers": [{
             "name": d["name"], "vehicle": d["vehicle"], "lap": d["lap"],
             "lap_time_s": d["lap_time"], "gap_s": d["lap_time"] - drivers[0]["lap_time"],
+            "position": d.get("position"),
             "coverage": d["coverage"], "zones": len(d["zones"]),
             "mean_brake_delta_m": next((x["mean_brake_delta_m"] for x in dsum
                                         if x["name"] == d["name"]), None),

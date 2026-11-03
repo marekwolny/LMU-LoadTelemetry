@@ -2084,7 +2084,8 @@ class LmuApp:
                 "cars": len(meta.get("vehicles") or []), "size": st.st_size / 1e6,
                 "demo": bool(meta.get("synthetic")), "player": player,
                 "best": fmt_lap(drivers[0].get("lap_time_s")) if drivers else "",
-                "mine": f"{fmt_lap(mine[1].get('lap_time_s'))} P{mine[0]}" if mine else "",
+                "mine": (f"{fmt_lap(mine[1].get('lap_time_s'))} "
+                         f"P{mine[1].get('position') or mine[0]}") if mine else "",
             }
             self.tracks.setdefault(track, {"stems": [], "track": track})["stems"].append(stem)
         for track, t in self.tracks.items():
