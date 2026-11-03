@@ -101,7 +101,7 @@ class SessionWriter:
         self._csv.writerow(FIELDS)
         with open(self.meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
-        print(f"[REC] nowy plik: {self.path}")
+        print(f"[REC] new file: {self.path}")
 
     def add_setup(self, text: str, wall: float, session_et: float) -> None:
         n = len(self.setups) + 1
@@ -294,7 +294,7 @@ class SetupWatch:
             try:
                 writer.add_setup(text, now, session_et)
             except OSError as e:
-                print(f"[REC] nie udalo sie zapisac setupu: {e}")
+                print(f"[REC] could not save the setup: {e}")
 
 
 def build_meta(sm, wall: float) -> dict:
@@ -442,7 +442,7 @@ def vehicles_full(sm):
 
 def run_probe(shm, seconds: float) -> int:
     """Diagnostyka: czy w pamieci sa realne inputy wszystkich aut."""
-    print(f"[PROBE] nasluch {seconds:g} s... (Ctrl+C przerwie)")
+    print(f"[PROBE] listening {seconds:g} s... (Ctrl+C stops)")
     stats = {}
     t_end = time.time() + seconds
     last_print = 0.0
@@ -454,7 +454,7 @@ def run_probe(shm, seconds: float) -> int:
         try:
             sm = shm.snapshot()
         except Exception as e:
-            print(f"[PROBE] blad odczytu: {e}")
+            print(f"[PROBE] read error: {e}")
             return 2
         vs = vehicles_full(sm)
         if not vs:
@@ -478,22 +478,22 @@ def run_probe(shm, seconds: float) -> int:
         now = time.time()
         if now - last_print >= 5:
             last_print = now
-            print(f"[PROBE] {track} | sesja {sc.mSession} | faza {sc.mGamePhase} | "
+            print(f"[PROBE] {track} | session {sc.mSession} | phase {sc.mGamePhase} | "
                   f"active={sm.telemetry.activeVehicles}/{sc.mNumVehicles} | "
-                  f"inputy widoczne: {sum(1 for st in stats.values() if (st['thr'][1]-st['thr'][0])>0.01 or (st['brk'][1]-st['brk'][0])>0.01)}/{len(stats)}")
+                  f"inputs visible: {sum(1 for st in stats.values() if (st['thr'][1]-st['thr'][0])>0.01 or (st['brk'][1]-st['brk'][0])>0.01)}/{len(stats)}")
 
-    print("\n[PROBE] podsumowanie (control: 0=gracz, 1=AI, 2=remote, 3=replay)")
-    print(f"{'id':>4} {'ctrl':>4} {'kierowca':22} {'gaz min/max':>13} {'ham min/max':>13} {'okr':>4} {'best':>9}")
+    print("\n[PROBE] summary (control: 0=player, 1=AI, 2=remote, 3=replay)")
+    print(f"{'id':>4} {'ctrl':>4} {'driver':22} {'thr min/max':>13} {'brk min/max':>13} {'laps':>4} {'best':>9}")
     for cid in sorted(stats):
         st = stats[cid]
         best = fmt_lap(st["best"]) if st["best"] else "-"
         varies = (st["thr"][1] - st["thr"][0] > 0.01) or (st["brk"][1] - st["brk"][0] > 0.01)
-        flag = "  <-- zmienne inputy" if varies else ""
+        flag = "  <-- inputs change" if varies else ""
         print(f"{cid:>4} {str(st['control']):>4} {st['driver'][:22]:22} "
               f"{st['thr'][0]:.2f}/{st['thr'][1]:.2f}   {st['brk'][0]:.2f}/{st['brk'][1]:.2f}   "
               f"{st['lap']:>4} {best:>9}{flag}")
     if not stats:
-        print("Brak aut w telemetti. Upewnij sie, ze jestes w sesji (nie w menu/monitorze).")
+        print("No cars in telemetry. Make sure you are in a session (not in the menu/monitor).")
     return 0
 
 
@@ -512,26 +512,26 @@ def run_dump(path: str, out_dir: str, frames: int) -> int:
             row["session_et"] = float(sm.scoring.scoringInfo.mCurrentET) + i / 30.0
             writer.write(row)
     writer.close()
-    print(f"[TEST] zapisano {writer.rows} wierszy -> {writer.path}")
+    print(f"[TEST] wrote {writer.rows} rows -> {writer.path}")
     return 0
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Loguje telemetrie wszystkich aut LMU")
-    ap.add_argument("--out", default="records", help="katalog wyjsciowy")
-    ap.add_argument("--hz", type=float, default=30.0, help="czestotliwosc probkowania (domyslnie 30)")
+    ap = argparse.ArgumentParser(description="Logs telemetry of all LMU cars")
+    ap.add_argument("--out", default="records", help="output folder")
+    ap.add_argument("--hz", type=float, default=30.0, help="sampling rate (default 30)")
     ap.add_argument("--driver", default=None,
-                    help="opcjonalnie: loguj tylko kierowcow, ktorych nazwa zawiera ten tekst")
-    ap.add_argument("--dump", default=None, help="tryb testowy: zapisz ramke z pliku shm_*.bin")
-    ap.add_argument("--frames", type=int, default=1, help="ile ramek w trybie --dump")
+                    help="optional: log only drivers whose name contains this text")
+    ap.add_argument("--dump", default=None, help="test mode: write a frame from an shm_*.bin file")
+    ap.add_argument("--frames", type=int, default=1, help="number of frames in --dump mode")
     ap.add_argument("--probe-seconds", type=float, default=0,
-                    help="tryb diagnostyczny: przez N s sprawdzaj, czy rywale maja realne inputy")
+                    help="diagnostic mode: check for N s whether rivals have real inputs")
     ap.add_argument("--keep-duplicates", action="store_true",
-                    help="zapisuj klatki nawet gdy session_et sie nie zmienia (pauza)")
+                    help="write frames even when session_et does not change (pause)")
     ap.add_argument("--max-seconds", type=float, default=0,
-                    help="zatrzymaj automatycznie po N sekundach (0 = bez limitu)")
+                    help="stop automatically after N seconds (0 = no limit)")
     ap.add_argument("--stop-file", default=None,
-                    help="zatrzymaj, gdy powstanie ten plik (graceful close)")
+                    help="stop when this file appears (graceful close)")
     args = ap.parse_args(argv)
 
     if args.dump:
@@ -541,7 +541,7 @@ def main(argv=None) -> int:
 
     def _sig(signum, frame):
         stop["flag"] = True
-        print("\n[REC] koncze na Ctrl+C...")
+        print("\n[REC] stopping on Ctrl+C...")
 
     signal.signal(signal.SIGINT, _sig)
     signal.signal(signal.SIGTERM, _sig)
@@ -550,17 +550,17 @@ def main(argv=None) -> int:
     try:
         shm = L.LmuSharedMemory().open()
     except Exception as e:
-        print(f"[REC] BLAD: {e}")
-        print("      Uruchom LMU i wlacz Settings > Gameplay > Enable Plugins "
+        print(f"[REC] ERROR: {e}")
+        print("      Start LMU and turn on Settings > Gameplay > Enable Plugins "
               "(external plugins).")
         return 2
-    print(f"[REC] podlaczono do LMU_Data (eventy: {'tak' if shm.has_events else 'nie, polling'})")
+    print(f"[REC] connected to LMU_Data (events: {'yes' if shm.has_events else 'no, polling'})")
     if args.probe_seconds > 0:
         try:
             return run_probe(shm, args.probe_seconds)
         finally:
             shm.close()
-    print(f"[REC] probkowanie {args.hz:g} Hz, Ctrl+C konczy")
+    print(f"[REC] sampling {args.hz:g} Hz, Ctrl+C stops")
 
     writer = None
     cur_key = None
@@ -573,7 +573,7 @@ def main(argv=None) -> int:
     t0 = time.time()
     stop_file = args.stop_file
     if stop_file and os.path.exists(stop_file):
-        print(f"[REC] uwaga: plik stopu juz istnieje: {stop_file} (usuwam i zaczynam)")
+        print(f"[REC] note: stop file already exists: {stop_file} (removing it and starting)")
         try:
             os.remove(stop_file)
         except OSError:
@@ -581,10 +581,10 @@ def main(argv=None) -> int:
     try:
         while not stop["flag"]:
             if stop_file and os.path.exists(stop_file):
-                print(f"[REC] znaleziono plik stopu {stop_file} - koncze")
+                print(f"[REC] found stop file {stop_file} - stopping")
                 break
             if args.max_seconds and time.time() - t0 >= args.max_seconds:
-                print(f"[REC] minelo {args.max_seconds:g} s - koncze")
+                print(f"[REC] {args.max_seconds:g} s elapsed - stopping")
                 break
             if shm.has_events:
                 # krotki timeout: nie zakladamy, ze event przychodzi przy kazdej klatce telemetrii
@@ -597,7 +597,7 @@ def main(argv=None) -> int:
             try:
                 sm = shm.snapshot()
             except Exception as e:
-                print(f"[REC] utrata pamieci wspoldzielonej: {e}")
+                print(f"[REC] lost shared memory: {e}")
                 break
             vs = vehicles_full(sm)
             if not vs:
@@ -607,7 +607,7 @@ def main(argv=None) -> int:
                     n = int(sc0.mNumVehicles)
                     ctrls = {int(sm.scoring.vehScoringInfo[i].mControl)
                              for i in range(min(max(n, 0), 104))}
-                    print(f"[REC] czekam: telemetria pusta (scoring: {n} aut, "
+                    print(f"[REC] waiting: telemetry empty (scoring: {n} cars, "
                           f"ctrl={sorted(ctrls)}, ET={float(sc0.mCurrentET):.1f})")
                 continue
             sc = sm.scoring.scoringInfo
@@ -617,11 +617,13 @@ def main(argv=None) -> int:
             if key != cur_key:
                 if writer:
                     writer.close()
-                    print(f"[REC] zamkniety {writer.path} ({writer.rows} wierszy)")
+                    print(f"[REC] closed {writer.path} ({writer.rows} rows)")
                 wall = now
                 meta = build_meta(sm, wall)
                 writer = SessionWriter(args.out, track, session_id, meta)
                 cur_key = key
+                # new session: otherwise the first [LAP] uses the previous session's lap and fuel
+                lap_watch = LapWatch()
                 setup_watch.poll(writer, float(sc.mCurrentET), now, force=True)
             # scoring (mCurrentET) odswieza sie tylko ~5 Hz, telemetria do 100 Hz -
             # klatka jest nowa, jesli zmienil sie czas scoringu ALBO telemetrii
@@ -660,15 +662,15 @@ def main(argv=None) -> int:
                     fastest = f" ({fast['driver']})"
                 left = ""
                 if args.max_seconds:
-                    left = f" | pozostalo {max(0, args.max_seconds - (now - t0)):.0f}s"
+                    left = f" | {max(0, args.max_seconds - (now - t0)):.0f}s left"
                 print(f"[REC] {track} | {SESSION_NAMES.get(session_id, session_id)} | "
-                      f"auta={len(vs)} | best={best_s}{fastest} | "
-                      f"{writer.rows} wierszy | {writer.size_mb():.1f} MB{left}")
+                      f"cars={len(vs)} | best={best_s}{fastest} | "
+                      f"{writer.rows} rows | {writer.size_mb():.1f} MB{left}")
                 writer.flush()
     finally:
         if writer:
             writer.close()
-            print(f"[REC] zapisane: {writer.path} ({writer.rows} wierszy, "
+            print(f"[REC] saved: {writer.path} ({writer.rows} rows, "
                   f"{writer.size_mb():.1f} MB)")
         shm.close()
     return 0

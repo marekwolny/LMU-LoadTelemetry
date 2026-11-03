@@ -121,7 +121,7 @@ class Analysis:
         self._integrate()
         self.base = None
         self.segments = self._segments()
-        self._segcache = {"hamowania": self.segments}
+        self._segcache = {"braking": self.segments}
         self.optimal = self._optimal()
 
     @staticmethod
@@ -194,7 +194,7 @@ class Analysis:
         return [tuple(s) for s in segs]
 
     def segments_for(self, mode):
-        """Podzial okrazenia: hamowania | zakręty | co 200 m | co 100 m | co 50 m."""
+        """Podzial okrazenia: braking | corners | every 200 / 100 / 50 m."""
         hit = self._segcache.get(mode)
         if hit is None:
             hit = self._segcache[mode] = self._build_segments(mode)
@@ -202,11 +202,11 @@ class Analysis:
 
     def _build_segments(self, mode):
         L = self.track_len
-        if mode.startswith("co "):
+        if mode.startswith("every "):
             step = float(mode.split()[1])
             n = max(1, round(L / step))
             return [(f"S{i + 1}", L * i / n, L * (i + 1) / n) for i in range(n)]
-        if mode != "zakręty":
+        if mode != "corners":
             return self.segments
         # zakret = od polowy prostej przed nim do polowy prostej za nim
         corners = []
@@ -311,21 +311,21 @@ def nice_step(span, target):
 class ChartView(tk.Frame):
     # (tytul, klucz, rodzaj, waga wysokosci, tlo panelu)
     PANELS = [("DELTA [s]", "dl", "delta", 1.8, "#f7f5fc"),
-              ("PRĘDKOŚĆ [km/h]", "spd", "speed", 1.9, "#f3f7fe"),
-              ("GAZ", "thr", "pct", 1.0, "#f2fbf4"),
-              ("HAMULEC", "brk", "pct", 1.0, "#fef4f3"),
-              ("BIEG", "gear", "gear", 0.6, "#f7f7f9"),
-              ("LINIA [m]  góra = lewa krawędź, dół = prawa  ·  czarna przerywana = optimum "
-               "(najszybszy kierowca na każdym odcinku)",
+              ("SPEED [km/h]", "spd", "speed", 1.9, "#f3f7fe"),
+              ("THROTTLE", "thr", "pct", 1.0, "#f2fbf4"),
+              ("BRAKE", "brk", "pct", 1.0, "#fef4f3"),
+              ("GEAR", "gear", "gear", 0.6, "#f7f7f9"),
+              ("LINE [m]  top = left edge, bottom = right  ·  black dashed = optimum "
+               "(fastest driver on each segment)",
                "side", "line", 1.7, "#eef5ea")]
     ML, MR, MT, MB, GAP = 58, 14, 44, 24, 10
     LANE = (18, 38)          # pasek odcinkow nad wykresami (y od-do)
-    SEG_MODES = ["hamowania", "zakręty", "co 200 m", "co 100 m", "co 50 m"]
-    SORTS = ["po kolei", "największa strata", "największy zysk"]
+    SEG_MODES = ["braking", "corners", "every 200 m", "every 100 m", "every 50 m"]
+    SORTS = ["in order", "biggest loss", "biggest gain"]
     BAR = "#f2f2f7"
 
     def __init__(self, master, on_hover=None, on_range=None, on_option=None,
-                 seg_mode="hamowania", seg_sort="po kolei", **kw):
+                 seg_mode="braking", seg_sort="in order", **kw):
         super().__init__(master, background=C_CARD, **kw)
         self.on_hover = on_hover
         self.on_range = on_range
@@ -335,8 +335,8 @@ class ChartView(tk.Frame):
         self.focus = None
         self.base = None
         self.x0, self.x1 = 0.0, 1.0
-        self.seg_mode = tk.StringVar(value=seg_mode if seg_mode in self.SEG_MODES else "hamowania")
-        self.seg_sort = tk.StringVar(value=seg_sort if seg_sort in self.SORTS else "po kolei")
+        self.seg_mode = tk.StringVar(value=seg_mode if seg_mode in self.SEG_MODES else "braking")
+        self.seg_sort = tk.StringVar(value=seg_sort if seg_sort in self.SORTS else "in order")
         # pasek "ja vs rywal" (na stale u gory) + wykres + kafelki odcinkow
         self.cmp = tk.Canvas(self, background=self.BAR, highlightthickness=0, height=64)
         self.cmp.pack(fill="x")
@@ -351,7 +351,7 @@ class ChartView(tk.Frame):
         self.cv.pack(fill="both", expand=True)
         tools = tk.Frame(self, background=C_CARD)
         tools.pack(fill="x", padx=6, pady=(4, 0))
-        tk.Label(tools, text="Odcinki", background=C_CARD, foreground=C_TEXT,
+        tk.Label(tools, text="Segments", background=C_CARD, foreground=C_TEXT,
                  font=(FONT, 9, "bold")).pack(side="left", padx=(2, 6))
         from tkinter import ttk
         for var, vals, wd in ((self.seg_mode, self.SEG_MODES, 11), (self.seg_sort, self.SORTS, 17)):
@@ -565,7 +565,7 @@ class ChartView(tk.Frame):
         if kind == "delta":
             return f"{v:+.2f}"
         if kind == "line":
-            return "0" if abs(v) < 0.05 else f"{abs(v):.0f} {'L' if v > 0 else 'P'}"
+            return "0" if abs(v) < 0.05 else f"{abs(v):.0f} {'L' if v > 0 else 'R'}"
         if kind == "gear":
             return "N" if v == 0 else ("R" if v < 0 else f"{v:.0f}")
         return f"{v:.0f}"
@@ -579,8 +579,8 @@ class ChartView(tk.Frame):
             return
         if not self.a or not self.selected:
             cv.create_text(w / 2, h / 2, fill=C_MUTED, font=(FONT, 11),
-                           text="Brak danych do wykresu." if not self.a else
-                           "Zaznacz kierowców w zakładce Wyniki.")
+                           text="No data to chart." if not self.a else
+                           "Select drivers in the Results tab.")
             return
         panels = self._panels()
         self._pcache = panels
@@ -644,13 +644,13 @@ class ChartView(tk.Frame):
                 v += ys
             title = p["title"]
             if p["kind"] == "delta" and self.base:
-                title += f"  vs {short(self.base, 20)}   (wyżej = wolniej, niżej = szybciej)"
+                title += f"  vs {short(self.base, 20)}   (up = slower, down = faster)"
             cv.create_text(p["l"] + 6, p["b"] - 3, anchor="sw", text=title, fill=C_MUTED,
                            font=(FONT, 8, "bold"))
         zoomed = self.x0 > 0.5 or self.x1 < self.a.track_len - 0.5
         if zoomed:
             cv.create_text(w - self.MR, 4, anchor="ne", fill=C_MUTED, font=(FONT, 8),
-                           text=f"zoom {self.x0:.0f}–{self.x1:.0f} m  ·  dwuklik = cały tor")
+                           text=f"zoom {self.x0:.0f}–{self.x1:.0f} m  ·  double-click = whole track")
         self._draw_cursor()
 
     def _seg_deltas(self):
@@ -668,7 +668,7 @@ class ChartView(tk.Frame):
         act = self._seg_index()
         many = len(segs) > 30
         cv.create_text(self.ML - 6, (y0 + y1) / 2, anchor="e", fill=C_AXIS,
-                       font=(FONT, 7, "bold"), text="ODCINKI")
+                       font=(FONT, 7, "bold"), text="SEGMENTS")
         for i, ((name, s0, s1), v) in enumerate(zip(segs, vals)):
             if s1 < self.x0 or s0 > self.x1:
                 continue
@@ -758,7 +758,7 @@ class ChartView(tk.Frame):
                 y = max(y, p["t"] + lab_h / 2)
                 txt = self._fmt(p["kind"], it[2]) + (" km/h" if p["kind"] == "speed" else "")
                 if p["kind"] == "line":
-                    txt = f"{abs(it[2]):.1f} m {'L' if it[2] > 0 else 'P'}"
+                    txt = f"{abs(it[2]):.1f} m {'L' if it[2] > 0 else 'R'}"
                 if p["kind"] == "delta" and it[1] == self.base:
                     continue
                 x = px + 6 if right else px - 6
@@ -816,14 +816,14 @@ class ChartView(tk.Frame):
             return
         if not a or not self.focus or not self.base or self.focus == self.base:
             cv.create_text(10, 17, anchor="w", fill=C_MUTED, font=(FONT, 9),
-                           text="Wybierz „Porównaj” i „vs” nad wykresem, aby zobaczyć deltę.  "
-                                "Przeciągnij = zoom · kółko = zoom · prawy przycisk = przesuń · "
-                                "dwuklik = cały tor")
+                           text="Pick “Compare” and “vs” above the chart to see the delta.  "
+                                "Drag = zoom · wheel = zoom · right button = pan · "
+                                "double-click = whole track")
             return
         d = self._hover_d
         if d is None:
             tf, tb = a.lap_time.get(self.focus), a.lap_time.get(self.base)
-            where = "całe okrążenie"
+            where = "full lap"
         else:
             tf, tb = a.t_at(self.focus, d), a.t_at(self.base, d)
             where = f"{d:.0f} m" + ("  📌" if self._pin is not None and d == self._pin else "")
@@ -833,13 +833,13 @@ class ChartView(tk.Frame):
         runs = []
         if delta is not None:
             col = C_LOSS if delta > 0.0005 else (C_GAIN if delta < -0.0005 else C_TEXT)
-            what = "tracisz" if delta > 0.0005 else ("zyskujesz" if delta < -0.0005 else "równo")
+            what = "losing" if delta > 0.0005 else ("gaining" if delta < -0.0005 else "even")
             runs += [(f"{delta:+.3f} s", col, ("Consolas", 14, "bold")),
                      (f"   {where} · {what}", C_MUTED, (FONT, 9))]
         if d is not None and a.optimal:
             on = a.optimal_driver(d)
             if on:
-                runs.append((f"   · optimum tu: {short(on, 16)}", C_TEXT, (FONT, 9)))
+                runs.append((f"   · optimum here: {short(on, 16)}", C_TEXT, (FONT, 9)))
         while runs:
             end = self._runs(0, 17, runs)
             ids = cv.find_all()[-len(runs):]
@@ -869,11 +869,11 @@ class ChartView(tk.Frame):
                 lo, hi = min(pairs), max(pairs)
                 lost = sum(v for v, _ in pairs if v > 0)
                 self._runs(10, y, [
-                    ("Najwięcej tracisz: ", C_MUTED, reg), (f"{hi[1]} {hi[0]:+.3f} s", C_LOSS, bold),
-                    ("   ·   najwięcej zyskujesz: ", C_MUTED, reg),
+                    ("Biggest loss: ", C_MUTED, reg), (f"{hi[1]} {hi[0]:+.3f} s", C_LOSS, bold),
+                    ("   ·   biggest gain: ", C_MUTED, reg),
                     (f"{lo[1]} {lo[0]:+.3f} s", C_GAIN, bold),
-                    (f"   ·   suma strat {lost:.2f} s na {sum(v > 0 for v, _ in pairs)} z "
-                     f"{len(pairs)} odcinków  ·  ◀ ▶ / strzałki = kolejny odcinek", C_MUTED, reg)])
+                    (f"   ·   total loss {lost:.2f} s on {sum(v > 0 for v, _ in pairs)} of "
+                     f"{len(pairs)} segments  ·  ◀ ▶ / arrow keys = next segment", C_MUTED, reg)])
             return
         name, s0, s1 = segs[i]
         key = (id(a), self.seg_mode.get(), self.focus, self.base, s0, s1)
@@ -898,20 +898,20 @@ class ChartView(tk.Frame):
             runs.extend([(f"  ·  {title} ", C_MUTED, reg), (fmt(vf), col, bold),
                          (f" / {fmt(vb)}{unit}", C_MUTED, reg)])
 
-        item("czas", f["t"], b["t"], lambda v: f"{v:.3f}", True, " s")
+        item("time", f["t"], b["t"], lambda v: f"{v:.3f}", True, " s")
         kmh = lambda v: f"{v:.0f}"
-        item("wejście", f["vin"], b["vin"], kmh, False)
+        item("entry", f["vin"], b["vin"], kmh, False)
         item("min.", f["vmin"], b["vmin"], kmh, False)
-        item("wyjście", f["vout"], b["vout"], kmh, False, " km/h")
+        item("exit", f["vout"], b["vout"], kmh, False, " km/h")
         if f["brk"] is not None and b["brk"] is not None:
             dd = f["brk"] - b["brk"]
-            txt = ("hamujesz tak samo" if abs(dd) < 3 else
-                   f"hamujesz {abs(dd):.0f} m {'później' if dd > 0 else 'wcześniej'}")
+            txt = ("same braking point" if abs(dd) < 3 else
+                   f"you brake {abs(dd):.0f} m {'later' if dd > 0 else 'earlier'}")
             runs.append((f"  ·  {txt}", C_GAIN if dd >= 3 else (C_LOSS if dd <= -3 else C_TEXT), reg))
         if f["full"] is not None and b["full"] is not None:
             dd = f["full"] - b["full"]
-            txt = ("pełny gaz tak samo" if abs(dd) < 3 else
-                   f"pełny gaz {abs(dd):.0f} m {'później' if dd > 0 else 'wcześniej'}")
+            txt = ("same full-throttle point" if abs(dd) < 3 else
+                   f"full throttle {abs(dd):.0f} m {'later' if dd > 0 else 'earlier'}")
             runs.append((f"  ·  {txt}", C_LOSS if dd >= 3 else (C_GAIN if dd <= -3 else C_TEXT), reg))
         self._runs(10, y, runs)
         # dowolny zakres = zoom (wlasny odcinek)
@@ -920,7 +920,7 @@ class ChartView(tk.Frame):
             v = a.seg_delta(self.focus, self.base, self.x0, self.x1)
             if v is not None:
                 tid = cv.create_text(W - 12, y, anchor="e", font=bold,
-                                     text=f"widok {self.x0:.0f}–{self.x1:.0f} m: {v:+.3f} s",
+                                     text=f"view {self.x0:.0f}–{self.x1:.0f} m: {v:+.3f} s",
                                      fill=C_LOSS if v > 0.0005 else C_GAIN)
                 bx = cv.bbox(tid)
                 cv.create_rectangle(bx[0] - 8, bx[1] - 2, W, bx[3] + 2, fill=self.BAR, outline="")
@@ -946,8 +946,8 @@ class ChartView(tk.Frame):
         has = any(v is not None for v in vals)
         order = list(range(len(segs)))
         srt = self.seg_sort.get()
-        if has and srt != "po kolei":
-            sgn = -1 if srt == "największa strata" else 1
+        if has and srt != "in order":
+            sgn = -1 if srt == "biggest loss" else 1
             order.sort(key=lambda k: sgn * vals[k] if vals[k] is not None else 1e9)
         act = self._seg_index()
         compact = len(segs) > 24
@@ -995,10 +995,10 @@ class ChartView(tk.Frame):
             cv.configure(height=y + rowh + 2)
         if has:
             tot = sum(v for v in vals if v is not None)
-            self.seg_info.configure(text=f"{len(segs)} odcinków · suma {tot:+.3f} s · "
-                                         f"klik = przybliż · najechanie = pokaż na wykresie")
+            self.seg_info.configure(text=f"{len(segs)} segments · total {tot:+.3f} s · "
+                                         f"click = zoom · hover = show on chart")
         else:
-            self.seg_info.configure(text=f"{len(segs)} odcinków")
+            self.seg_info.configure(text=f"{len(segs)} segments")
 
     # ------------------------------------------------------------ hover
     def _set_hover(self, d):
@@ -1167,7 +1167,7 @@ class MapView(tk.Frame):
         if w < 50 or h < 50:
             return
         if not self.a or not self.base:
-            cv.create_text(w / 2, h / 2, text="Brak mapy.", fill=C_MUTED, font=(FONT, 11))
+            cv.create_text(w / 2, h / 2, text="No map.", fill=C_MUTED, font=(FONT, 11))
             return
         if self._detail():
             return self._redraw_detail(w, h)
@@ -1195,7 +1195,7 @@ class MapView(tk.Frame):
                 cv.create_line(X(tr["x"][i]), Y(tr["z"][i]), X(tr["x"][j]), Y(tr["z"][j]),
                                fill=col, width=6, capstyle="round")
             legend = (f"{short(self.base, 14)} vs {short(self.delta_vs, 14)}:  "
-                      f"zielony = zysk, czerwony = strata")
+                      f"green = gain, red = loss")
         else:
             for i in range(0, n - stride, stride):
                 j = i + stride
@@ -1208,10 +1208,10 @@ class MapView(tk.Frame):
                     continue
                 cv.create_line(X(tr["x"][i]), Y(tr["z"][i]), X(tr["x"][j]), Y(tr["z"][j]),
                                fill=col, width=5, capstyle="round")
-            legend = f"{short(self.base, 14)}:  czerwony = hamulec, pomarańczowy = część gazu"
+            legend = f"{short(self.base, 14)}:  red = brake, orange = partial throttle"
         sx, sy = X(tr["x"][0]), Y(tr["z"][0])
         cv.create_rectangle(sx - 4, sy - 4, sx + 4, sy + 4, fill=C_TEXT, outline=C_CARD)
-        cv.create_text(sx + 8, sy, anchor="w", text="S/M", fill=C_TEXT, font=(FONT, 8, "bold"))
+        cv.create_text(sx + 8, sy, anchor="w", text="S/F", fill=C_TEXT, font=(FONT, 8, "bold"))
         for z in self.a.braking:
             rs = z.get("ref_start")
             p = self._pt(self.base, rs) if rs is not None else None
@@ -1219,7 +1219,7 @@ class MapView(tk.Frame):
                 continue
             x, y = p
             cv.create_oval(x - 9, y - 9, x + 9, y + 9, fill="#3a3a3c", outline=C_CARD, width=2)
-            cv.create_text(x, y, text=z.get("corner", "").lstrip("H"), fill="#ffffff",
+            cv.create_text(x, y, text=z.get("corner", "").lstrip("HB"), fill="#ffffff",
                            font=(FONT, 7, "bold"))
         cv.create_text(8, h - 4, anchor="sw", fill=C_MUTED, font=(FONT, 8), text=legend)
         self._draw_range()
@@ -1382,16 +1382,16 @@ class MapView(tk.Frame):
                 self._marker(tf, e["thr"], "dot", self.C_THR, X, Y)
             if o:
                 db = tf["d"][e["brk"]] - tr_["d"][o["brk"]]
-                labels.append((tf, e["brk"], "hamujesz tak samo" if abs(db) < 3 else
-                               f"hamujesz {abs(db):.0f} m {'później' if db > 0 else 'wcześniej'}",
+                labels.append((tf, e["brk"], "same braking point" if abs(db) < 3 else
+                               f"you brake {abs(db):.0f} m {'later' if db > 0 else 'earlier'}",
                                self.C_THR if db >= 3 else (self.C_BRK if db <= -3 else self.D_TXT)))
                 dv = tf["spd"][e["apex"]] - tr_["spd"][o["apex"]]
                 labels.append((tf, e["apex"], f"min {tf['spd'][e['apex']]:.0f} km/h ({dv:+.0f})",
                                self.C_THR if dv > 1 else (self.C_BRK if dv < -1 else self.D_TXT)))
                 if e["thr"] is not None and o["thr"] is not None:
                     dg = tf["d"][e["thr"]] - tr_["d"][o["thr"]]
-                    labels.append((tf, e["thr"], "gaz tak samo" if abs(dg) < 3 else
-                                   f"pełny gaz {abs(dg):.0f} m {'później' if dg > 0 else 'wcześniej'}",
+                    labels.append((tf, e["thr"], "same throttle point" if abs(dg) < 3 else
+                                   f"full throttle {abs(dg):.0f} m {'later' if dg > 0 else 'earlier'}",
                                    self.C_BRK if dg >= 3 else (self.C_THR if dg <= -3 else self.D_TXT)))
             else:
                 labels.append((tf, e["apex"], f"min {tf['spd'][e['apex']]:.0f} km/h", self.D_TXT))
@@ -1406,8 +1406,8 @@ class MapView(tk.Frame):
         cv.create_line(14, hh - 4, 14 + sx, hh - 4, fill=self.D_TXT, width=2)
         cv.create_text(18 + sx, hh - 4, anchor="w", text="10 m", fill=self.D_TXT, font=(FONT, 8))
         lx, ly = 10, h - 12
-        items = [(self.C_BRK, "hamulec"), (self.C_COAST, "toczenie / część gazu"),
-                 (self.C_THR, "pełny gaz")]
+        items = [(self.C_BRK, "brake"), (self.C_COAST, "coast / partial throttle"),
+                 (self.C_THR, "full throttle")]
         for c, txt in items:
             cv.create_line(lx, ly, lx + 16, ly, fill=c, width=4, capstyle="round")
             tid = cv.create_text(lx + 22, ly, anchor="w", text=txt, fill=self.D_TXT, font=(FONT, 8))
@@ -1418,11 +1418,11 @@ class MapView(tk.Frame):
                                  font=(FONT, 8))
             lx = cv.bbox(tid)[2] + 14
         cv.create_text(lx, ly, anchor="w", fill="#8e8e93", font=(FONT, 8),
-                       text="▲ hamowanie  ● szczyt  ● gaz  ·  dwuklik wykresu = cały tor")
+                       text="▲ braking  ● apex  ● throttle  ·  double-click chart = whole track")
         cv.create_text(12, 10, anchor="nw", fill=self.D_TXT, font=(FONT, 10, "bold"),
                        text=f"{short(focus, 18)}" + (f"  vs  {short(rival, 18)}" if rival else ""))
         cv.create_text(12, 28, anchor="nw", fill="#8e8e93", font=(FONT, 8),
-                       text=f"{d0:.0f}–{d1:.0f} m" + ("" if left else "  ·  granice toru po ponownej analizie"))
+                       text=f"{d0:.0f}–{d1:.0f} m" + ("" if left else "  ·  track edges after re-analysis"))
         self._draw_hover()
 
     def _marker(self, t, i, kind, col, X, Y):

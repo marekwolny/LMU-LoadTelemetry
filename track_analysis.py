@@ -290,11 +290,11 @@ def collect_traces(selected, files, edges=None):
     return out
 
 
-SESSION_TAG = (("_practice", "T"), ("_quali", "Q"), ("_race", "W"), ("_warmup", "R"))
+SESSION_TAG = (("_practice", "P"), ("_quali", "Q"), ("_race", "R"), ("_warmup", "W"))
 
 
 def session_label(path) -> str:
-    """'20261031_213243_..._quali.csv.gz' -> 'Q 31.10 21:32' (+ ' gra' dla importu z gry)."""
+    """'20261031_213243_..._quali.csv.gz' -> 'Q 31.10 21:32'."""
     name = Path(path).name
     tag = next((t for k, t in SESSION_TAG if k in name), "?")
     try:
@@ -315,7 +315,7 @@ def own_sessions(laps, player, exclude_file, n):
             per[lap["file"]] = lap
     out = {}
     for lap in sorted(per.values(), key=lambda l: l["duration"])[:max(0, n)]:
-        out[f"Ty · {session_label(lap['file'])}"] = lap
+        out[f"You · {session_label(lap['file'])}"] = lap
     return out
 
 
@@ -370,7 +370,7 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
         used.add(name)
     drivers.sort(key=lambda d: d["lap_time"])
     if not drivers:
-        raise RuntimeError("Nie udalo sie zbudowac przebiegow zadnego kierowcy.")
+        raise RuntimeError("Could not build traces for any driver.")
     ref_name = drivers[0]["name"]
     table = analyze.braking_table(drivers, ref_name)
     dsum = analyze.driver_summary(drivers, ref_name)
@@ -422,7 +422,7 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
     edges.write(str(outdir / "edges.csv"), track_len)
     summary = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "track": track, "session": "tor (wiele sesji)", "track_length_m": track_len,
+        "track": track, "session": "track (multiple sessions)", "track_length_m": track_len,
         "player": player, "reference": ref_name,
         "inputs": [str(p) for p, _ in files],
         "drivers": [{
@@ -453,7 +453,7 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
                         for k, v in z.items()} for z in dd["zones"]]
         drv_payload.append(dd)
     payload = {
-        "track": track, "session": "tor (wiele sesji)",
+        "track": track, "session": "track (multiple sessions)",
         "generated": summary["generated_at"], "track_length": round(track_len, 2),
         "step": 2.0, "grid": [round(g, 2) for g in drivers[0]["grid"]],
         "inputs": [Path(p).name for p, _ in files],
@@ -466,7 +466,7 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
                        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
                        .replace("</", "<\\/"))
     page = page.replace("__PAGE_TITLE__",
-                        html_lib.escape(f"LMU telemetria — {track} / tor"))
+                        html_lib.escape(f"LMU telemetry — {track} / track"))
     (outdir / "report.html").write_text(page, encoding="utf-8")
     try:
         (outdir / "ai_brief.md").write_text(
@@ -477,21 +477,21 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Analiza po torze (wiele sesji)")
-    ap.add_argument("--track", required=False, help="nazwa toru (dokladna)")
-    ap.add_argument("--player", default=None, help="Twoja nazwa kierowcy")
+    ap = argparse.ArgumentParser(description="Per-track analysis (multiple sessions)")
+    ap.add_argument("--track", required=False, help="track name (exact)")
+    ap.add_argument("--player", default=None, help="your driver name")
     ap.add_argument("--filter", choices=["all", "faster", "faster_or_sector"],
                     default="faster_or_sector")
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--player-lap", type=int, default=1, choices=[1, 2, 3],
-                    help="ktore z Twoich 3 najlepszych okrazen uzyc (1=najszybsze)")
+                    help="which of your 3 best laps to use (1=fastest)")
     ap.add_argument("--sector-tol", type=float, default=0.15,
-                    help="tolerancja sektora [s] (5 Hz -> 0.2 s)")
+                    help="sector tolerance [s] (5 Hz -> 0.2 s)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--cls", default="all", choices=["all", "mine"],
-                    help="mine = rywale tylko z Twojej klasy aut")
+                    help="mine = rivals from your car class only")
     ap.add_argument("--own", type=int, default=3,
-                    help="ile Twoich okrazen z innych sesji dolozyc (najlepsze z kazdej sesji)")
+                    help="how many of your laps from other sessions to add (best of each session)")
     ap.add_argument("--list-tracks", action="store_true")
     args = ap.parse_args(argv)
 
@@ -505,23 +505,23 @@ def main(argv=None) -> int:
             print(t)
         return 0
     if not args.track:
-        print("Podaj --track (albo --list-tracks).")
+        print("Pass --track (or --list-tracks).")
         return 2
 
     files = recording_files(args.track)
     if not files:
-        print(f"Brak nagran dla toru: {args.track}")
+        print(f"No recordings for track: {args.track}")
         return 2
-    print(f"[TOR] {args.track}: {len(files)} nagran")
+    print(f"[TRACK] {args.track}: {len(files)} recordings")
     laps, track_len = scan_track(args.track, files)
     if not laps:
-        print("Brak kompletnych okrazen po filtrach.")
+        print("No complete laps after filtering.")
         return 2
     best_by_driver = best_per_driver(laps)
     names = list(best_by_driver)
     player = find_player(args.player, names) if args.player else None
     if not player:
-        print(f"Nie znaleziono kierowcy {args.player!r}. Dostepni: {', '.join(sorted(names)[:30])}")
+        print(f"Driver {args.player!r} not found. Available: {', '.join(sorted(names)[:30])}")
         return 2
     player_laps = best_by_driver[player]
     idx = min(max(args.player_lap - 1, 0), len(player_laps) - 1)
@@ -530,14 +530,14 @@ def main(argv=None) -> int:
     player_sectors = {k: player_best.get(k) for k in ("s1", "s2", "s3")}
 
     overall = sorted(laps, key=lambda x: x["duration"])[:3]
-    print(f"[TOR] 3 najszybsze okrazenia na torze (wszyscy):")
+    print("[TRACK] 3 fastest laps on the track (everyone):")
     for i, lap in enumerate(overall, 1):
         print(f"  {i}. {fmt_lap(lap['duration'])}  {lap['driver']}  "
               f"({Path(lap['file']).name})")
 
-    print(f"\n[TOR] Twoje najlepsze okrazenia na {args.track}:")
+    print(f"\n[TRACK] Your best laps at {args.track}:")
     for i, lap in enumerate(player_laps, 1):
-        mark = "  <-- uzywam" if i == idx + 1 else ""
+        mark = "  <-- using" if i == idx + 1 else ""
         print(f"  {i}. {fmt_lap(lap['duration'])}  ({Path(lap['file']).name}, "
               f"S1={lap['s1'] and round(lap['s1'],3)}, S2={lap['s2'] and round(lap['s2'],3)}, "
               f"S3={lap['s3'] and round(lap['s3'],3)}){mark}")
@@ -550,7 +550,7 @@ def main(argv=None) -> int:
                 cmap[(str(p), v["driver"])] = v.get("class") or ""
     pcls = cmap.get((str(player_choice["file"]), player)) if args.cls == "mine" else None
     if pcls:
-        print(f"[TOR] rywale tylko z klasy {pcls}")
+        print(f"[TRACK] rivals from class {pcls} only")
     cands = []
     for name, arr in best_by_driver.items():
         if name == player:
@@ -569,7 +569,7 @@ def main(argv=None) -> int:
     selected_names = [player] + [n for n, _ in cands[:max(0, top - 1)]]
     selected_names = selected_names[:top]
     # pokaz kandydatow
-    print(f"\n[TOR] Filtr: {args.filter}; wybrani ({len(selected_names)}):")
+    print(f"\n[TRACK] Filter: {args.filter}; selected ({len(selected_names)}):")
     for n in selected_names:
         lap = player_choice if n == player else best_by_driver[n][0]
         d = lap["duration"] - player_best["duration"]
@@ -580,13 +580,13 @@ def main(argv=None) -> int:
                     flags.append(k.upper())
         print(f"  {n:28} {fmt_lap(lap['duration'])}  ({d:+.3f} s)  "
               f"S1={lap['s1'] and round(lap['s1'],3)} S2={lap['s2'] and round(lap['s2'],3)} "
-              f"S3={lap['s3'] and round(lap['s3'],3)}  szybszy: {','.join(flags) or '-'}")
+              f"S3={lap['s3'] and round(lap['s3'],3)}  faster: {','.join(flags) or '-'}")
 
     # Twoje okrazenia z innych sesji (paleta wykresow ma 10 kolorow)
     own = own_sessions(laps, player, player_choice["file"],
                        min(args.own, max(0, 10 - len(selected_names))))
     if own:
-        print(f"\n[TOR] Twoje okrazenia z innych sesji ({len(own)}):")
+        print(f"\n[TRACK] Your laps from other sessions ({len(own)}):")
         for n, lap in own.items():
             print(f"  {n:28} {fmt_lap(lap['duration'])}  "
                   f"({lap['duration'] - player_best['duration']:+.3f} s)")
@@ -595,8 +595,8 @@ def main(argv=None) -> int:
     drivers, table, dsum, ref = build(selected_names, best_by_driver, files,
                                       args.track, track_len, player, outdir,
                                       player_choice=player_choice, own=own)
-    print(f"\n[TOR] raport: {outdir / 'report.html'}")
-    print(f"[TOR] referencja: {ref}; kierowcow w raporcie: {len(drivers)}")
+    print(f"\n[TRACK] report: {outdir / 'report.html'}")
+    print(f"[TRACK] reference: {ref}; drivers in the report: {len(drivers)}")
     return 0
 
 

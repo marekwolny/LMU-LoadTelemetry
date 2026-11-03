@@ -23,10 +23,10 @@ import math
 import statistics
 from pathlib import Path
 
-VERSION = 4
+VERSION = 5
 G = 9.81
 WH = ("fl", "fr", "rl", "rr")
-PHASES = (("entry", "wejście"), ("mid", "środek"), ("exit", "wyjście"))
+PHASES = (("entry", "entry"), ("mid", "mid"), ("exit", "exit"))
 BAL_TH = 0.35          # deg - ponizej tego balans uznajemy za neutralny
 
 
@@ -181,7 +181,7 @@ def find_corners(rows, track_len):
         corners.append({"d0": round(d0, 1), "apex": round(apex, 1), "d1": round(min(d1 + 20, track_len), 1),
                         "dir": "L" if sum(rows[i]["ax"] or 0 for i in seg) > 0 else "P"})
     for n, c in enumerate(corners, 1):
-        c["name"] = f"Z{n}"
+        c["name"] = f"C{n}"
     return corners
 
 
@@ -252,22 +252,22 @@ def hint(phase, bal, lltd=None):
         return ""
     us = bal > 0
     if phase == "entry":
-        return ("balans hamulców do tyłu, więcej dyfra na hamowaniu (coast), miękciej przód"
-                if us else "balans hamulców do przodu, mniej dyfra coast / więcej preload, twardziej przód")
+        return ("brake bias rearward, more diff coast lock, softer front"
+                if us else "brake bias forward, less diff coast / more preload, stiffer front")
     if phase == "mid":
-        base = ("miękciej stabilizator przód lub twardziej tył, więcej docisku z przodu"
-                if us else "twardziej stabilizator przód lub miękciej tył, więcej tylnego skrzydła")
+        base = ("softer front anti-roll bar or stiffer rear, more front downforce"
+                if us else "stiffer front anti-roll bar or softer rear, more rear wing")
         if lltd is not None:
-            base += f" (LLTD przód {lltd:.0f}%)"
+            base += f" (front LLTD {lltd:.0f}%)"
         return base
-    return ("mniej dyfra na gazie (power), twardziej tył, płynniej gaz"
-            if us else "wyższe TC, więcej dyfra power / mniej preload, miękciej tył, później gaz")
+    return ("less diff power lock, stiffer rear, smoother throttle"
+            if us else "higher TC, more diff power / less preload, softer rear, later throttle")
 
 
 def analyze(path: Path, track_len: float, corner_names=None) -> dict:
     laps = read_laps(path, track_len)
     if not laps:
-        return {"version": VERSION, "error": "Brak pełnych okrążeń w danych podwozia."}
+        return {"version": VERSION, "error": "No complete laps in the chassis data."}
     laps.sort(key=lambda l: l["time"])
     best = laps[0]["time"]
     use = [l for l in laps if l["time"] <= best * 1.02][:3]
@@ -342,5 +342,5 @@ def describe_bal(v):
     if v is None:
         return "—"
     if abs(v) < BAL_TH:
-        return f"neutralnie {v:+.1f}°"
-    return f"{'podsterowność' if v > 0 else 'nadsterowność'} {abs(v):.1f}°"
+        return f"neutral {v:+.1f}°"
+    return f"{'understeer' if v > 0 else 'oversteer'} {abs(v):.1f}°"

@@ -112,35 +112,35 @@ def build_lap(samples, track_len, lap_start, lap_time, step):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="Nagrania LMU -> TinyPedal Best Lap (.tplap)")
-    ap.add_argument("inputs", nargs="+", help="pliki .csv.gz lub katalogi")
-    ap.add_argument("--out", default="tinypedal_laps", help="katalog wynikow")
+    ap = argparse.ArgumentParser(description="LMU recordings -> TinyPedal Best Lap (.tplap)")
+    ap.add_argument("inputs", nargs="+", help=".csv.gz files or folders")
+    ap.add_argument("--out", default="tinypedal_laps", help="output folder")
     ap.add_argument("--driver", default=None,
-                    help="fragment nazwy kierowcy (domyslnie: gracz z metadanych)")
-    ap.add_argument("--class", dest="car_class", default=None, help="tylko ta klasa auta")
+                    help="part of the driver name (default: player from metadata)")
+    ap.add_argument("--class", dest="car_class", default=None, help="this car class only")
     ap.add_argument("--top", type=int, default=0,
-                    help="eksportuj N najszybszych kierowcow zamiast jednego")
-    ap.add_argument("--step", type=float, default=5.0, help="krok dystansu [m] (TinyPedal: 5)")
+                    help="export the N fastest drivers instead of one")
+    ap.add_argument("--step", type=float, default=5.0, help="distance step [m] (TinyPedal: 5)")
     ap.add_argument("--min-coverage", type=float, default=0.97)
     args = ap.parse_args(argv)
 
     paths = [p for p in expand_inputs(args.inputs) if os.path.exists(p)]
     if not paths:
-        print("Brak plikow wejsciowych.")
+        print("No input files.")
         return 2
 
     candidates, max_d, min_best = scan_laps(paths)
     covered = {(c["track"], c["session"], c["car_id"], c["driver"]) for c in candidates}
     candidates += scan_laps_by_number(paths, covered)
     if not candidates:
-        print("Nie znaleziono okrazen.")
+        print("No laps found.")
         return 2
     key = pick_session(candidates, max_d)
     track, _ = key
     meta = next((m for m in map(meta_for, paths) if m.get("track") == track), {})
     track_len = float(meta.get("track_length_m") or max_d[key] or 0.0)
     if track_len <= 0:
-        print("Nie znam dlugosci toru (brak metadanych).")
+        print("Unknown track length (no metadata).")
         return 2
 
     _, best_by_key = valid_laps(candidates, track_len, key, args.min_coverage)
@@ -154,12 +154,12 @@ def main(argv=None):
     else:
         name = args.driver or meta.get("player", "")
         if not name:
-            print("Podaj --driver (brak gracza w metadanych).")
+            print("Pass --driver (no player in metadata).")
             return 2
         selected = [c for c in best if name.lower() in c["driver"].lower()][:1]
     if not selected:
-        print("Brak kompletnego okrazenia dla wybranych filtrow.")
-        print("Kierowcy z pelnym okrazeniem:", ", ".join(sorted({c["driver"] for c in best})) or "-")
+        print("No complete lap for the selected filters.")
+        print("Drivers with a full lap:", ", ".join(sorted({c["driver"] for c in best})) or "-")
         return 2
 
     targets = {lap_key(c["driver"], c["car_id"], c["lap"], c["start"], c.get("start_fallback", False))
@@ -177,7 +177,7 @@ def main(argv=None):
         lap_start = 0.0 if c.get("start_fallback") else c["start"]
         built = build_lap(traces.get(tkey, []), track_len, lap_start, lap_time, args.step)
         if built is None:
-            print(f"[POMIJAM] {c['driver']}: za malo probek")
+            print(f"[SKIP] {c['driver']}: not enough samples")
             continue
         delta, telemetry = built
         class_name = classes.get(c["driver"], "")
@@ -203,7 +203,7 @@ def main(argv=None):
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(data, fh)
         print(f"[OK] {fmt_lap(lap_time)}  {c['driver']} ({class_name}, {c['vehicle']})  "
-              f"probek: {c['samples']} -> {path}")
+              f"samples: {c['samples']} -> {path}")
     return 0
 
 

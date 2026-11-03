@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-10-31T20:30:26",
+  "generated_at": "2026-11-03T10:28:56",
   "track": "Demo Raceway (SYNTHETIC)",
   "session": "quali",
   "track_length_m": 4000.0,
   "inputs": [
-    "records_demo/20261031_113524_DemoRaceway_quali.csv.gz"
+    "records_demo/20261103_084739_DemoRaceway_quali.csv.gz"
   ],
   "reference": "Demo_Aliens",
   "drivers": [
@@ -44,7 +44,7 @@
   ],
   "braking": [
     {
-      "corner": "H1",
+      "corner": "B1",
       "ref_start": 0.0,
       "drivers": [
         {
@@ -83,7 +83,7 @@
       ]
     },
     {
-      "corner": "H2",
+      "corner": "B2",
       "ref_start": 720.0,
       "drivers": [
         {
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "corner": "H3",
+      "corner": "B3",
       "ref_start": 1342.0,
       "drivers": [
         {
@@ -161,7 +161,7 @@
       ]
     },
     {
-      "corner": "H4",
+      "corner": "B4",
       "ref_start": 1878.0,
       "drivers": [
         {
@@ -200,7 +200,7 @@
       ]
     },
     {
-      "corner": "H5",
+      "corner": "B5",
       "ref_start": 2546.0,
       "drivers": [
         {
@@ -239,7 +239,7 @@
       ]
     },
     {
-      "corner": "H6",
+      "corner": "B6",
       "ref_start": 3118.0,
       "drivers": [
         {

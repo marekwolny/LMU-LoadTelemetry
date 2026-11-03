@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LMU LoadTelemetry</title>
+<meta name="description" content="Offline telemetry for Le Mans Ultimate: record every car on track, compare your laps with rivals, plan fuel, review setups and handling.">
+<meta property="og:title" content="LMU LoadTelemetry">
+<meta property="og:description" content="Offline telemetry for Le Mans Ultimate: record every car on track and see where you lose time.">
+<meta property="og:image" content="screenshots/charts-map.png">
+<style>
+  :root {
+    --bg: #f2f2f7;
+    --card: #ffffff;
+    --text: #1c1c1e;
+    --muted: #6e6e73;
+    --line: #e5e5ea;
+    --accent: #007aff;
+    --green: #248a3d;
+    --red: #e0291e;
+    --code-bg: #f5f5f8;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.06);
+    --coffee: #ffdd00;
+    --coffee-text: #000000;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --text: #f2f2f7;
+      --muted: #a1a1a6;
+      --line: #38383a;
+      --accent: #0a84ff;
+      --green: #30d158;
+      --red: #ff453a;
+      --code-bg: #2c2c2e;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+  header.top {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 0;
+  }
+  .brand { font-weight: 700; font-size: 18px; color: var(--text); }
+  .brand span { color: var(--muted); font-weight: 500; }
+  nav a { margin-left: 18px; font-weight: 600; font-size: 15px; }
+  .hero { padding: 40px 0 28px; text-align: center; }
+  .hero h1 {
+    font-size: clamp(32px, 6vw, 56px); line-height: 1.08; margin: 0 0 14px; letter-spacing: -0.02em;
+  }
+  .hero p.lead { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 760px; margin: 0 auto 26px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 16px;
+    border: 1px solid transparent;
+  }
+  .btn:hover { text-decoration: none; filter: brightness(1.05); }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--card); color: var(--accent); border-color: var(--line); }
+  .btn.coffee { background: var(--coffee); color: var(--coffee-text); }
+  .shot-hero {
+    margin: 34px auto 0; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow);
+    border: 1px solid var(--line); background: var(--card);
+  }
+  .shot-hero img { display: block; width: 100%; height: auto; }
+  .note { font-size: 13px; color: var(--muted); margin-top: 10px; text-align: center; }
+  section { padding: 36px 0; }
+  h2 { font-size: clamp(24px, 3.4vw, 32px); margin: 0 0 8px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 22px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 18px 16px; box-shadow: var(--shadow);
+  }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .gallery { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  figure { margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  figure a { display: block; }
+  figure img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--line); }
+  figcaption { padding: 12px 14px 14px; font-size: 14px; color: var(--muted); }
+  figcaption b { color: var(--text); }
+  ol.steps { margin: 0; padding-left: 22px; }
+  ol.steps li { margin: 0 0 14px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; overflow-x: auto; font-size: 14px; margin: 8px 0 0;
+  }
+  code { font-family: ui-monospace, "Cascadia Code", Consolas, "DejaVu Sans Mono", monospace; font-size: 0.92em; }
+  p code, li code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+  .two { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .support {
+    text-align: center; background: var(--card); border: 1px solid var(--line);
+    border-radius: 18px; padding: 34px 20px; box-shadow: var(--shadow);
+  }
+  .support p { color: var(--muted); max-width: 620px; margin: 0 auto 20px; }
+  footer { padding: 28px 0 40px; color: var(--muted); font-size: 14px; text-align: center; }
+  @media (max-width: 560px) {
+    nav a { margin-left: 12px; font-size: 14px; }
+    .brand span { display: none; }
+    .hero { padding-top: 20px; }
+    .gallery { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">LMU LoadTelemetry <span>· for Le Mans Ultimate</span></div>
+    <nav>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/marekwolny/LMU-LoadTelemetry">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1>See exactly where you lose time.</h1>
+    <p class="lead">An offline telemetry tool for Le Mans Ultimate. It records <b>every car on track</b>
+      from the game's shared memory and compares your laps with your rivals': braking points,
+      throttle pickup, apex speed and racing line, corner by corner.</p>
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/marekwolny/LMU-LoadTelemetry">View on GitHub</a>
+      <a class="btn ghost" href="#install">How to run it</a>
+      <a class="btn coffee" href="https://buymeacoffee.com/soa1marekd">☕ Buy me a coffee</a>
+    </div>
+    <div class="shot-hero">
+      <a href="screenshots/charts-map.png"><img src="screenshots/charts-map.png" width="1600" height="1000"
+        alt="LMU LoadTelemetry main window: session library on the left, time delta, speed, throttle, brake and gear charts by distance, and a track map coloured by gain and loss"></a>
+    </div>
+    <p class="note">All screenshots use the bundled synthetic demo session, not real player data.</p>
+  </div>
+
+  <section id="features">
+    <h2>What it does</h2>
+    <p class="sub">Pure Python standard library and tkinter. No server, no account, nothing leaves your PC.</p>
+    <div class="grid">
+      <div class="card"><h3>Records the whole field</h3><p>Throttle, brake, steering, gear, speed and position of all cars in the session, live or from an in-game replay.</p></div>
+      <div class="card"><h3>Lap and corner comparison</h3><p>Time delta by distance, per-segment gain/loss, braking zones and a dark corner view with both racing lines.</p></div>
+      <div class="card"><h3>Classes and cars</h3><p>Best laps per class, gap to the class leader, sector times and your ideal lap.</p></div>
+      <div class="card"><h3>Fuel calculator</h3><p>Real consumption per lap from your recordings; fuel for qualifying, timed or lap races, and a setup saved with that fuel.</p></div>
+      <div class="card"><h3>Training plan</h3><p>The corners where you lose the most, why (braking, coasting, apex speed, line) and what to try next.</p></div>
+      <div class="card"><h3>Setup and handling</h3><p>Setup snapshots per lap and comparisons; understeer/oversteer, load transfer, tyres and ride height per corner phase.</p></div>
+      <div class="card"><h3>Voice engineer for VR</h3><p>Lap time, gap to your best and fuel laps read out after every lap, plus a VR panel for OpenKneeboard.</p></div>
+      <div class="card"><h3>Game telemetry import</h3><p>Converts LMU's built-in DuckDB telemetry into recordings, so sessions you didn't record still show up.</p></div>
+    </div>
+  </section>
+
+  <section id="screenshots">
+    <h2>Screenshots</h2>
+    <p class="sub">Click any image for full size.</p>
+    <div class="gallery">
+      <figure>
+        <a href="screenshots/charts-map.png"><img src="screenshots/charts-map.png" loading="lazy" width="1600" height="1000" alt="Charts and track map tab comparing two drivers over a full lap"></a>
+        <figcaption><b>Charts &amp; map:</b> time delta, speed, pedals, gear and line by distance; the map shows where you gain (green) or lose (red).</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/line-comparison.png"><img src="screenshots/line-comparison.png" loading="lazy" width="1600" height="1000" alt="Zoomed corner with a dark map comparing the racing lines of two drivers"></a>
+        <figcaption><b>Corner zoom:</b> braking, coasting and full-throttle phases of your line against a rival's, with braking point, apex and throttle markers.</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/classes-cars.png"><img src="screenshots/classes-cars.png" loading="lazy" width="1600" height="1000" alt="Classes and cars table with best laps, gaps and sector times"></a>
+        <figcaption><b>Classes &amp; cars:</b> best laps per class, gaps, sectors and ideal laps.</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/fuel-calculator.png"><img src="screenshots/fuel-calculator.png" loading="lazy" width="1600" height="1000" alt="Fuel calculator with per-lap fuel use from the recording"></a>
+        <figcaption><b>Fuel:</b> consumption per lap and stint, and how much to fuel for qualifying or a race.</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/training-plan.png"><img src="screenshots/training-plan.png" loading="lazy" width="1600" height="1000" alt="Training plan listing the corners with the biggest time loss and tips"></a>
+        <figcaption><b>Training plan:</b> biggest losses, their causes and concrete tips.</figcaption>
+      </figure>
+      <figure>
+        <a href="screenshots/html-report.png"><img src="screenshots/html-report.png" loading="lazy" width="1600" height="1000" alt="Interactive HTML report with lap summary and brake trace"></a>
+        <figcaption><b>HTML report:</b> a self-contained interactive report with zoom, tooltips and light/dark mode.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install and run</h2>
+    <p class="sub">Windows + Python 3.11 or newer. No <code>pip install</code> needed (DuckDB is only for the optional game import).</p>
+    <div class="two">
+      <div class="card">
+        <h3>1. Get the code</h3>
+        <pre><code>git clone https://github.com/marekwolny/LMU-LoadTelemetry
+cd LMU-LoadTelemetry</code></pre>
+        <h3 style="margin-top:16px">2. Enable plugins in LMU</h3>
+        <p>In the game: <code>Settings → Gameplay → Enable external plugins</code> = on.</p>
+        <h3 style="margin-top:16px">3. Start the app</h3>
+        <p>Double-click <code>START_LMU_TELEMETRY.cmd</code>, or run:</p>
+        <pre><code>pythonw lmu_app.py</code></pre>
+      </div>
+      <div class="card">
+        <h3>4. Record a session</h3>
+        <p>Get on track (or play a replay at 1×) and press <b>● Record</b> or <b>F9</b>.
+          Press it again to stop; the session is analysed and opens on the right.</p>
+        <h3 style="margin-top:16px">Command line, if you prefer</h3>
+        <pre><code>python record.py --probe-seconds 10
+python record.py --out records --hz 30
+python analyze.py records/*.csv.gz --out analysis --top 6</code></pre>
+        <h3 style="margin-top:16px">Try it without the game</h3>
+        <pre><code>python make_demo.py --out records_demo
+python analyze.py records_demo/*.csv.gz --out analysis_demo</code></pre>
+        <p style="margin-top:8px">Optional game-telemetry import: <code>python -m pip install duckdb</code></p>
+      </div>
+    </div>
+    <p class="note">Full documentation is in the <a href="https://github.com/marekwolny/LMU-LoadTelemetry#readme">README</a>
+      (<a href="https://github.com/marekwolny/LMU-LoadTelemetry/blob/main/README.pl.md">Polski</a>).
+      The tool only reads LMU's official shared memory: it does not inject code, modify the game or touch EAC.</p>
+  </section>
+
+  <section id="support">
+    <div class="support">
+      <h2>Like it? Fuel the next update.</h2>
+      <p>LMU LoadTelemetry is a free hobby project. If it helped you find a few tenths, a coffee keeps it going.</p>
+      <a class="btn coffee" href="https://buymeacoffee.com/soa1marekd">☕ Buy me a coffee</a>
+    </div>
+  </section>
+
+  <footer>
+    LMU LoadTelemetry by Marek Wolny ·
+    <a href="https://github.com/marekwolny/LMU-LoadTelemetry">GitHub</a> ·
+    <a href="https://buymeacoffee.com/soa1marekd">Buy Me a Coffee</a><br>
+    Not affiliated with Le Mans Ultimate, Studio 397 or Motorsport Games.
+  </footer>
+</div>
+</body>
+</html>

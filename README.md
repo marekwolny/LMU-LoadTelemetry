@@ -1,426 +1,457 @@
 # LMU LoadTelemetry
 
-## 0. Aplikacja offline (najprościej)
+**English** · [Polski](README.pl.md)
 
-Kliknij dwuklikiem **`START_LMU_TELEMETRY.cmd`** (albo `pythonw lmu_app.py`).
-Aplikacja jest w całości lokalna — nie wymaga internetu.
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support%20the%20project-FFDD00?logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/soa1marekd)
 
-Wszystko jest w **jednym oknie** — wyniki przeglądasz w aplikacji, bez przeglądarki:
+A local, offline telemetry tool for **Le Mans Ultimate**. It records **every car on track**
+(throttle, brake, steering, gear, speed, position) from the game's official shared memory
+and compares your laps with your rivals': where they brake, where they get back on the
+throttle, which line they take and where you lose time. It also covers setups, fuel,
+handling, a training plan and a voice race engineer for VR.
 
-- **Pasek nagrywania (góra)** — `● Nagrywaj` / `■ Stop` (albo **F9**), licznik czasu,
-  stan na żywo (tor, sesja, liczba aut, najlepszy czas, rozmiar). Z opcją
-  „po stopie analizuj i pokaż” nagranie jest od razu analizowane i otwiera się po prawej.
-  **Test połączenia** = 10-sekundowa diagnostyka LMU (wynik w logu).
-- **Biblioteka (lewa strona)** — tory i ich sesje (najlepszy czas, Twój czas i pozycja).
-  Niebieskie = jeszcze bez analizy (dwuklik / Enter analizuje). **Wiersz toru** = analiza
-  ze wszystkich sesji z tego toru. Szukanie po torze lub kierowcy, filtr typu sesji,
-  „Analizuj nowe” przetwarza wszystko naraz. Prawy przycisk = menu.
-- **Podgląd (prawa strona)**:
-  - **Wyniki** — ranking, strata, średnie Δ hamowania / gazu; ☐/☑ wybiera kierowców do wykresów,
-  - **Wykresy i mapa** — **delta czasu** (Porównaj X vs Y: gdzie zyskujesz/tracisz),
-    stały pasek u góry z czasem obu kierowców w punkcie kursora (klik na wykresie = przypnij
-    kursor, klik w pinezkę = odepnij) i szczegółami odcinka: czas, prędkość wejścia / min. /
-    wyjścia, o ile metrów wcześniej/później hamujesz i wciskasz pełny gaz,
-  - **Odcinki** — pasek nad wykresami + kafelki `H1 +0.08` (kolor = wielkość straty/zysku,
-    klik = zoom, najechanie = pokaż miejsce); podział: od hamowania, zakręty (od połowy prostej
-    do połowy prostej), co 200 / 100 / 50 m; sortowanie po stracie/zysku; ◀ ▶ lub strzałki =
-    następny odcinek; przeciągnięcie dowolnego zakresu pokazuje jego deltę (własny odcinek),
-    prędkość / gaz / hamulec / bieg po dystansie + mapa toru (zielony = zysk,
-    czerwony = strata); **⛶ Pełny ekran** (F11, Esc wraca) pokazuje same wykresy i mapę; przeciągnij lub
-    kółko = zoom, prawy przycisk = przesuń, dwuklik = cały tor, kursor pokazuje wartości
-    i pozycję aut na mapie; klik na mapie przybliża to miejsce,
-  - **Klasy i auta** — najlepsze czasy Twoje i rywali osobno dla każdej klasy (Hypercar / LMP2 /
-    GT3…), opcjonalnie pogrupowane po aucie/zespole; na wierszu toru zbiorczo ze wszystkich
-    sesji. Strata do lidera klasy (s i %), sektory najlepszego okrążenia, idealne okrążenie
-    (suma najlepszych sektorów), liczba okrążeń. Dwuklik = porównaj na wykresach.
-    Δ S1/S2/S3 = w którym sektorze ile tracisz (do lidera klasy, do najlepszych sektorów
-    klasy albo „mnie (Ty)”: + = tyle tracisz do danego kierowcy; ▲ = największa strata).
-    Widok sektorów: czas + strata w jednej komórce / tylko strata / tylko czasy. Sektory i model auta biorę też z plików wyników LMU
-    (`UserData/Log/Results/*.xml`, dopasowanie po czasie startu sesji) — działa też dla
-    starszych nagrań.
-    „Analiza porównuje: moja klasa” (domyślnie) sprawia, że analiza sesji i toru bierze
-    rywali tylko z Twojej klasy — GT3 nie jest porównywane z Hypercarami,
-  - **Setup** — rejestrator kopiuje setup, którym jedziesz (`UserData/player/TempModFile.svm`),
-    do nagrania (`*.setupN.svm`) na starcie i przy każdej zmianie w trakcie sesji; ★ = setup
-    z Twojego najlepszego okrążenia. Nazwa rozpoznawana przez porównanie z `Settings/<tor>`
-    („nazwa + N zmian”, gdy zmodyfikowany). Porównanie z setupem z innej sesji albo zapisanym
-    plikiem (różnice podświetlone, „tylko różnice”). Do starych nagrań: „Przypisz setup z
-    pliku…”. Na wierszu toru: Twoje sesje + setup z najlepszego okrążenia,
-  - **Prowadzenie** — z pliku `*.chassis.csv.gz` (podwozie Twojego auta, 100 Hz: naciski kół,
-    ugięcie zawieszenia, prześwit, kąty poślizgu opon, temperatury, przeciążenia). Na każdym
-    zakręcie (wykrywanym z krzywizny toru) osobno wejście / środek / wyjście: balans = poślizg
-    opon przód − tył (+ podsterowność, − nadsterowność), nacisk na przód, LLTD przód (podział
-    bocznego transferu masy między osie), na zewnętrzne koła, min. prześwit, czas fazy +
-    podpowiedź ustawień. Karty: balans średnio, opony (wewn./środek/zewn., ciśnienie, camber),
-    prześwit (minimum, przy V max, rake, dobicia). „Porównaj z sesją” = ten sam tor z innym
-    setupem: Δ balans i Δ czas na każdym zakręcie. Średnia z 3 najszybszych okrążeń. Tylko
-    nowe nagrania (stare nie mają danych podwozia), tylko Twoje auto (rywale ich nie wysyłają),
-  - **Paliwo** — zużycie Twojego auta na każde okrążenie z nagrań (wyjazdowe / pomiarowe /
-    zjazdowe, stinty, ostrzeżenie „zabrakło paliwa”) + kalkulator: kwalifikacje (wyjazd +
-    N pomiarowych + zjazd), wyścig na czas (okrążenia z Twojego tempa + to, na którym kończy
-    się czas) albo na okrążenia, okrążenie formujące (zmierzone z 1. okrążenia wyścigu), zapas.
-    Domyślnie maksymalne zużycie ze wszystkich sesji tym autem na torze. Gdy sesja ma setup,
-    pokazuje też, ile L/okr. zakłada gra i o ile się myli. „Zapisz setup z tym paliwem” tworzy
-    kopię wybranego setupu z ustawionym paliwem (LMP2/LMP3: `FuelSetting`, litry = indeks + 5;
-    Hypercar/GT3: `VirtualEnergySetting` w %) w `Settings/<tor>` — w grze: Garaż → Setup → Load,
-  - **VR: inżynier głosowy + Panel VR** — podczas nagrywania rejestrator wysyła po każdym
-    Twoim okrążeniu zdarzenie `[LAP]`. Przełącznik „inżynier głosowy” czyta: czas okrążenia,
-    różnicę do najlepszego, na ile okrążeń starczy paliwa/energii i — w wyścigu na czas — ile
-    brakuje do mety i ile oszczędzać na okrążenie. Głos: Windows (System.Speech); polski, jeśli
-    zainstalowany (Ustawienia → Czas i język → Mowa → Dodaj głosy → Polski), inaczej angielski.
-    „Panel VR” = czarne okno z dużymi wartościami do podpięcia w goglach przez OpenKneeboard
-    (karta „Window capture” → okno „LMU Panel VR”),
-  - **Porównanie linii w zakręcie** — po przybliżeniu mapa w ciemnym stylu: Twoja linia
-    kolorowana hamulec / toczenie / pełny gaz, rywal biała przerywana, znaczniki ▲ hamowanie,
-    ● szczyt (min. prędkość), ● pełny gaz z opisem różnic, auta przy kursorze,
-  - **Plan treningu** — 3 (5 / wszystkie) odcinki, gdzie tracisz najwięcej, ze stratą na wejściu
-    i wyjściu oraz przyczynami po polsku i wskazówką: punkt i siła hamowania, puszczanie
-    hamulca (trail braking), toczenie bez gazu i hamulca, prędkość w szczycie, pełny gaz,
-    prędkość wyjścia, linia w szczycie. Porównanie z wybranym kierowcą albo z najszybszym na
-    każdym odcinku; „pokaż na wykresie” przybliża zakręt; lista miejsc, gdzie jesteś szybszy,
-  - **Import z gry** — wbudowana telemetria LMU (Ustawienia → Sterowanie → Rozgrywka →
-    Telemetry Recording) zapisuje każdą sesję do `UserData/Telemetry/*.duckdb` (Twoje auto +
-    setup). Przycisk „Import z gry (n)” zamienia nowe pliki na nagrania aplikacji (sesja „z gry”,
-    setup automatycznie, pozycja GPS dopasowana do mapy z wcześniejszego nagrania toru) i od
-    razu je analizuje. Działa też dla sesji, kiedy aplikacja nie nagrywała. Pliki w trakcie
-    zapisu (sesja trwa) są pomijane, tak samo pliki bez pełnego okrążenia i sesje, które
-    nagranie aplikacji pokrywa w ≥90% czasu (bez duplikatu). Gdy aplikacja nagrywała krócej niż
-    gra, plik gry jest importowany — ma okrążenia, których aplikacja nie złapała. Rywale:
-    plik gry ma tylko Twoje auto, ale „Klasy i auta” dokłada wszystkich kierowców z pliku
-    wyników LMU (najlepszy czas, sektory, model auta); ich wykresów/linii nie ma. Wymaga `python -m pip install duckdb`. Format plików
-    i tabela kluczy setupu: LMU Telemetry Lab (MIT),
-  - **Linia przejazdu** — panel „LINIA” pokazuje, gdzie każdy kierowca był między krawędziami
-    toru (góra = lewa, dół = prawa; krawędzie z `mTrackEdge` wszystkich aut w nagraniu).
-    Po przybliżeniu odcinka mapa pokazuje ten fragment z asfaltem i prawdziwymi liniami aut.
-    Czarna przerywana = **optimum z danych** (na każdym odcinku linia najszybszego tam kierowcy).
-    Linii z asysty gry nie da się odczytać — pliki torów LMU (`.mas`) są zaszyfrowane.
-    Starsze analizy potrzebują „Analizuj ponownie”, żeby mieć linię i krawędzie.
-  - **Strefy hamowania** — H1…Hn dla zaznaczonych kierowców (dwuklik = zoom na zakręt),
-  - **Brief AI** — gotowy tekst do skopiowania do Claude/ChatGPT.
-- **Raport HTML** otwiera pełny raport w przeglądarce, **TinyPedal** eksportuje okrążenie
-  zaznaczonego kierowcy (albo Twoje).
+- Pure Python standard library + tkinter: no server, no account, no internet needed.
+- Everything happens in one window. The HTML report is optional.
 
-Ustawienia (kierowca, filtr rywali, opcje) zapisują się w `lmu_app_settings.json`.
-Raporty sesji trafiają do `analysis/<nazwa pliku>/`, raport toru do `analysis/track_<tor>/`.
+> Screenshots below show the app running on the **synthetic demo session**
+> (`records_demo/`, generated by `make_demo.py`). This is not real player data.
 
-### Filtr toru
+| | |
+|---|---|
+| [![Charts and track map](docs/screenshots/charts-map.png)](docs/screenshots/charts-map.png)<br>**Charts & map**: time delta, speed, throttle, brake, gear and line per distance; per-segment gain/loss tiles; track map coloured by gain/loss | [![Line comparison in a corner](docs/screenshots/line-comparison.png)](docs/screenshots/line-comparison.png)<br>**Corner zoom**: the map switches to a dark line-comparison view (brake / coast / full throttle, rival dashed) with braking point, apex and throttle markers |
+| [![Classes and cars](docs/screenshots/classes-cars.png)](docs/screenshots/classes-cars.png)<br>**Classes & cars**: best laps per class, gap to class leader, sectors, ideal lap | [![Fuel calculator](docs/screenshots/fuel-calculator.png)](docs/screenshots/fuel-calculator.png)<br>**Fuel**: per-lap consumption from your recordings and a fuel calculator for qualifying and races |
+| [![Training plan](docs/screenshots/training-plan.png)](docs/screenshots/training-plan.png)<br>**Training plan**: the corners where you lose the most, why, and what to try | [![HTML report](docs/screenshots/html-report.png)](docs/screenshots/html-report.png)<br>**HTML report**: interactive, self-contained report with zoom, tooltips and light/dark mode |
 
-- **szybsi lub szybszy sektor** (domyślnie) — kierowca wchodzi, jeśli ma lepsze
-  okrążenie od wybranego Twojego okrążenia **lub** któryś sektor szybszy
-  o więcej niż tolerancja (domyślnie 0,15 s).
-- **tylko szybsi** — wyłącznie lepsze okrążenie.
-- **wszyscy** — bez filtra.
+If the tool helps you go faster, you can [buy me a coffee ☕](https://buymeacoffee.com/soa1marekd).
 
-Raport toru dokłada też **Twoje najlepsze okrążenie z każdej innej sesji** (do 3, linie
-„Ty · Q 31.10 21:32”; T = trening, Q = kwalifikacje, W = wyścig), także z sesji importowanych
-z gry — na wykresach i mapie widać, co zmieniłeś między sesjami. Okrążenia krótsze od rekordu
-kierowcy wg gry (przerwany wyjazd, dystans z poprzedniego okrążenia tuż po linii) są odrzucane.
+## 0. Offline app (the easy way)
 
-Sektory dla starszych nagrań są wyliczane z telemetrii (0/1/2) z dokładnością
-~0,2 s (5 Hz). Nowe nagrania zapisują też sektory ze scoringu LMU.
+Double-click **`START_LMU_TELEMETRY.cmd`** (or run `pythonw lmu_app.py`).
+The app is fully local and needs no internet connection.
 
-W raporcie HTML:
+Everything lives in **one window**, and you browse results inside the app (no browser needed):
 
-- wybór kierowcy (lista „Kierowca”) i checkboxy do porównania wielu,
-- **zoom**: przeciągnij po wykresie, `+`/`−`, dwuklik lub **Reset zoom**,
-- mapa toru z markerami `H1…Hn`, checkbox **Pokaż linie zaznaczonych kierowców**,
-- tooltipy, tryb jasny/ciemny, tabele i eksport CSV.
+- **Recording bar (top)**: **● Record** / **■ Stop** (or **F9**), a timer and live status
+  (track, session, number of cars, best time, file size). With **analyze and show after stop**
+  enabled, the recording is analyzed right away and opens on the right.
+  **Test connection** runs a 10-second LMU diagnostic (result in the log).
+- **Library (left)**: tracks and their sessions (best time, your time and position).
+  Blue rows are not analyzed yet (double-click / Enter analyzes them). A **track row** is
+  the analysis across all sessions on that track. You can search by track or driver and
+  filter by session type. **Analyze new** processes everything at once. Right-click opens
+  a menu.
+- **Viewer (right)**:
+  - **Results**: ranking, gap, average Δ braking / throttle; ☐/☑ selects which drivers
+    appear in the charts,
+  - **Charts & map**: **time delta** (**Compare** X **vs** Y: where you gain or lose). A fixed
+    bar at the top shows both drivers' times at the cursor (click on a chart pins the cursor,
+    click the pin to release it) plus segment details: time, entry / minimum / exit speed,
+    and how many metres earlier or later you brake and reach full throttle,
+  - **Segments**: a strip above the charts plus tiles such as `B1 +0.08` (colour = size of
+    the loss/gain, click = zoom, hover = show the spot). Segment modes: braking (from braking
+    point), corners (from mid-straight to mid-straight), every 200 / 100 / 50 m; sort by
+    loss/gain; ◀ ▶ or the arrow keys jump to the next segment. Dragging any range shows its
+    delta (custom segment). Speed / throttle / brake / gear by distance + a track map
+    (green = gain, red = loss). **⛶ Full screen** (F11, Esc to leave) shows just the charts
+    and map. Drag or mouse wheel = zoom, right button = pan, double-click = whole track.
+    The cursor shows values and car positions on the map; clicking the map zooms to that spot,
+  - **Classes & cars**: your and your rivals' best times separately for each class
+    (Hypercar / LMP2 / GT3…), optionally grouped by car model/team. On a track row the numbers
+    are aggregated over all sessions. Gap to the class leader (s and %), sectors of the best
+    lap, ideal lap (sum of best sectors), number of laps. Double-click = compare in the charts.
+    Δ S1/S2/S3 = how much you lose in each sector (to the class leader, to the class's best
+    sectors or to **me (you)**: + = how much you lose to that driver; ▲ = biggest loss).
+    Sector view: time + gap in one cell / gap only / times only. Sectors and car model are
+    also taken from LMU result files (`UserData/Log/Results/*.xml`, matched by session start
+    time), so this works for older recordings too.
+    **Analysis compares: my class** (the default) makes the session and track analysis use
+    rivals from your class only, so GT3 is not compared with Hypercars,
+  - **Setup**: the recorder copies the setup you are driving (`UserData/player/TempModFile.svm`)
+    into the recording (`*.setupN.svm`) at the start and on every change during the session;
+    ★ = setup used on your best lap. The name is recognised by comparing with `Settings/<track>`
+    ("name + N changes" when modified). Compare with a setup from another session or a saved
+    file (differences highlighted, **differences only**). For old recordings:
+    **Assign setup from file…**. On a track row: your sessions + the setup from your best lap,
+  - **Handling**: from `*.chassis.csv.gz` (your car's chassis at 100 Hz: wheel loads,
+    suspension deflection, ride height, tyre slip angles, temperatures, g-forces).
+    For every corner (detected from track curvature), separately for entry / mid / exit:
+    balance = front − rear tyre slip (+ understeer, − oversteer), front load, front LLTD
+    (lateral load transfer distribution between axles), load on the outside wheels, minimum
+    ride height, phase time + a setup hint. Cards: average balance, tyres (inner/middle/outer,
+    pressure, camber), ride height (minimum, at top speed, rake, bottoming).
+    **Compare with session** = same track with a different setup: Δ balance and Δ time in
+    every corner. Averaged over the 3 fastest laps. New recordings only (old ones have no
+    chassis data), your car only (rivals don't send it),
+  - **Fuel**: your car's consumption on every lap from recordings (out / timed / in laps,
+    stints, a "ran out of fuel" warning) + a calculator: qualifying (out lap + N timed laps +
+    in lap), timed race (laps from your pace + the lap on which time runs out) or a lap-count
+    race, formation lap (measured from race lap 1), margin. By default it uses the maximum
+    consumption from all sessions with this car on this track. When the session has a setup,
+    it also shows how many L/lap the game assumes and how far off that is.
+    **Save setup with this fuel** writes a copy of the chosen setup with the fuel set
+    (LMP2/LMP3: `FuelSetting`, litres = index + 5; Hypercar/GT3: `VirtualEnergySetting` in %)
+    into `Settings/<track>`. In the game: Garage → Setup → Load,
+  - **VR: voice engineer + VR panel**: while recording, the recorder emits a `[LAP]` event
+    after each of your laps. The **voice engineer** switch reads out: lap time, gap to your
+    best, how many laps your fuel/energy lasts and, in a timed race, how much is missing to
+    the finish and how much to save per lap. Voice: Windows (System.Speech), an English voice
+    if one is installed, otherwise the system default. **VR panel** = a black window with large
+    values you can pin in your headset via OpenKneeboard ("Window capture" tab → window
+    "LMU VR Panel"),
+  - **Corner line comparison**: when zoomed in, the map switches to a dark style: your line
+    coloured brake / coast / full throttle, the rival as a white dashed line, markers
+    ▲ braking, ● apex (minimum speed), ● full throttle with a description of the differences,
+    and the cars at the cursor,
+  - **Training plan**: the 3 (5 / all) segments where you lose the most, with loss on entry
+    and exit, the reasons and a tip: braking point and pressure, brake release (trail
+    braking), coasting without throttle or brake, apex speed, full throttle, exit speed, line
+    at the apex. Compare with a chosen driver or with the fastest driver in each segment;
+    **show on chart** zooms to the corner; also a list of places where you are faster,
+  - **Import from game**: LMU's built-in telemetry (Settings → Controls → Gameplay →
+    Telemetry Recording) saves every session to `UserData/Telemetry/*.duckdb` (your car +
+    setup). The **Import from game (n)** button converts new files into app recordings
+    (session marked "from game", setup included, GPS position fitted to the map from an
+    earlier recording of the track) and analyzes them right away. This also works for sessions
+    the app did not record. Files still being written (session in progress) are skipped, as
+    are files without a full lap and sessions that an app recording covers for ≥90% of the
+    time (no duplicates). When the app recorded for less time than the game, the game file is
+    imported, because it has laps the app missed. Rivals: the game file only has your car, but
+    **Classes & cars** adds all drivers from the LMU results file (best time, sectors, car
+    model); there are no charts/lines for them. Requires `python -m pip install duckdb`. File
+    format and the setup key table: LMU Telemetry Lab (MIT),
+  - **Driving line**: the **LINE** panel shows where each driver was between the track edges
+    (top = left, bottom = right; edges from `mTrackEdge` of all cars in the recording).
+    When a segment is zoomed, the map shows that part with tarmac and the cars' real lines.
+    The black dashed line is the **optimum from the data** (on each segment, the line of the
+    driver who was fastest there). The game's driving-assist line cannot be read: LMU track
+    files (`.mas`) are encrypted. Older analyses need **Analyze again** to get the line and
+    edges,
+  - **Braking zones**: B1…Bn for the selected drivers (double-click = zoom to the corner),
+  - **AI brief**: a ready-made text to copy into Claude/ChatGPT.
+- **HTML report** opens the full report in the browser; **TinyPedal** exports the lap of the
+  selected driver (or yours).
 
----
+Settings (driver, rival filter, options) are saved in `lmu_app_settings.json`.
+Session reports go to `analysis/<file name>/`, the track report to `analysis/track_<track>/`.
 
-Odczyt telemetrii **wszystkich aut** z Le Mans Ultimate: gaz, hamulec, kierownica,
-bieg, RPM, prędkość, pozycja X/Z, okrążenie i dystans. Celem jest porównanie
-najszybszych kierowców z kwalifikacji — kiedy hamują, kiedy wracają na gaz i gdzie
-na torze to robią.
+### Track filter
 
-> **Status:** zweryfikowane na żywym LMU (online): shared memory działa,
-> widać wszystkie auta (9–40), a **rywale `ctrl=2` mają realne, zmienne gaz/hamulec**.
-> Nagrano i przeanalizowano practice, kwalifikacje i wyścig na Paul Ricard.
-> Aplikacja offline, raporty HTML i brief AI działają. Do sprawdzenia zostaje
-> odtwarzanie replaya (`ctrl=3`) — nie było testowane.
+- **faster or faster sector** (default): a driver is included if their lap is better than
+  your chosen lap **or** any sector is faster by more than the tolerance (default 0.15 s).
+- **faster only**: only a better lap.
+- **everyone**: no filter.
 
----
+The track report also adds **your best lap from every other session** (up to 3, lines such as
+"You · Q 31.10 21:32"; P = practice, Q = qualifying, R = race, W = warm-up), including sessions
+imported from the game, so the charts and map show what you changed between sessions. Laps
+shorter than the driver's record according to the game (aborted run, distance carried over
+from the previous lap right after the line) are discarded.
 
-## 1. Co działa, a co jest do potwierdzenia
+Sectors for older recordings are computed from telemetry (0/1/2) with ~0.2 s accuracy (5 Hz).
+New recordings also store sectors from LMU scoring.
 
-**Działa / zweryfikowane**
+In the HTML report:
 
-- Odczyt oficjalnej pamięci współdzielonej LMU `LMU_Data` (bez pluginów zewnętrznych).
-- Tablica `SharedMemoryTelemetryData.telemInfo[104]` zawiera telemetrię **wszystkich
-  aktywnych pojazdów**, nie tylko gracza.
-- Na prawdziwym zrzucie z Barcelony (sesja z 44 autami) każdy pojazd miał własne
-  `throttle`, `brake`, `steering`, `gear`, `rpm`, pozycję i dystans.
-- Logger zapisuje wszystkie auta do `csv.gz`; analiza i raport HTML działają.
-- **Na żywo w online**: 9–40 aut; rywale `ctrl=2` mają realne, zmienne
-  `gaz/hamulec` (potwierdzone probe'em i nagraniami quali/wyścigu na Paul Ricard).
-- Demo bez gry: `make_demo.py` + `analyze.py` (dane syntetyczne, oznaczone w raporcie).
-- Aplikacja offline (`lmu_app.py`) i analiza po torze (`track_analysis.py`) działają.
-
-**Do potwierdzenia**
-
-- Czy podczas **odtwarzania replaya** tablica zawiera wszystkie auta (`mControl == 3`).
-  HUD replaya LMU pokazuje inputy każdego auta, więc jest to bardzo prawdopodobne,
-  ale nie testowałem tego na żywo.
-- Dokładność rywali: shared memory odświeża ich dane ~5 Hz (0,2 s, ~10–15 m przy
-  dużej prędkości). Delty mniejsze niż ~10–15 m traktuj jako przybliżone.
-- Jeśli online/replay pokaże tylko obserwowane auto — trzeba nagrywać po jednym
-  aucie, przełączając kamerę (patrz sekcja 5).
-
-**Odrzucona ścieżka**
-
-- Bezpośredni parser `.Vcr` offline: format jest binarny, nieudokumentowany i inny
-  niż klasyczny rF2 VCR (gMotor/network log). Nie znalazłem gotowego parsera dla LMU.
-  Pewna droga to **replay w grze + `record.py`**.
+- driver selection (**Driver** list) and checkboxes to compare several drivers,
+- **zoom**: drag over a chart, `+`/`−`, double-click or **Reset zoom**,
+- track map with `B1…Bn` markers, checkbox **Show lines of selected drivers**,
+- tooltips, light/dark mode, tables and CSV export.
 
 ---
 
-## 2. Wymagania
+Reads telemetry of **all cars** from Le Mans Ultimate: throttle, brake, steering, gear, RPM,
+speed, X/Z position, lap and distance. The goal is to compare the fastest drivers in
+qualifying: when they brake, when they get back on the throttle and where on track they do it.
 
-- Windows + Python 3.11+ (wystarczy czysty stdlib — **żadnych `pip install`**).
-- LMU zainstalowane i uruchamiane **bez** działającej atrapy `lmu-spoof`.
-- W LMU: `Settings → Gameplay → Enable external plugins` = włączone
-  (u Ciebie w `Settings.JSON` jest już `true`).
-
-> **Uwaga o atrapie:** `C:\soa1\local\lmu-spoof\fake\Le Mans Ultimate.exe` trzyma
-> nazwę procesu, port 6397 i `LMU_Data`. Przed odpaleniem prawdziwego LMU zamknij
-> spoof/GUI, inaczej gra nie wystartuje albo będzie konflikt o pamięć/port.
+> **Status:** verified on live LMU (online): shared memory works, all cars are visible
+> (9–40), and **rivals with `ctrl=2` have real, changing throttle/brake values**.
+> Practice, qualifying and a race at Paul Ricard were recorded and analysed.
+> The offline app, HTML reports and AI brief work. Replay playback (`ctrl=3`) is still to be
+> checked; it has not been tested.
 
 ---
 
-## 3. Szybki start — kwalifikacje na żywo
+## 1. What works and what still needs confirming
+
+**Works / verified**
+
+- Reading LMU's official shared memory `LMU_Data` (no third-party plugins).
+- The `SharedMemoryTelemetryData.telemInfo[104]` array contains telemetry for **all active
+  vehicles**, not just the player.
+- On a real dump from Barcelona (session with 44 cars) every vehicle had its own `throttle`,
+  `brake`, `steering`, `gear`, `rpm`, position and distance.
+- The logger writes all cars to `csv.gz`; analysis and the HTML report work.
+- **Live online**: 9–40 cars; rivals with `ctrl=2` have real, changing throttle/brake
+  (confirmed with the probe and with qualifying/race recordings at Paul Ricard).
+- Demo without the game: `make_demo.py` + `analyze.py` (synthetic data, marked in the report).
+- The offline app (`lmu_app.py`) and per-track analysis (`track_analysis.py`) work.
+
+**To be confirmed**
+
+- Whether the array contains all cars during **replay playback** (`mControl == 3`).
+  LMU's replay HUD shows every car's inputs, so it is very likely, but I have not tested it
+  live.
+- Rival accuracy: shared memory refreshes their data at ~5 Hz (0.2 s, ~10–15 m at high
+  speed). Treat deltas smaller than ~10–15 m as approximate.
+- If online/replay only exposes the spectated car, you have to record one car at a time by
+  switching the camera (see section 5).
+
+**Rejected approach**
+
+- A direct offline `.Vcr` parser: the format is binary, undocumented and different from the
+  classic rF2 VCR (gMotor/network log). I found no ready-made parser for LMU.
+  The reliable route is **replay in the game + `record.py`**.
+
+---
+
+## 2. Requirements
+
+- Windows + Python 3.11+ (the plain standard library is enough: **no `pip install`**).
+- LMU installed and started **without** the `lmu-spoof` dummy running.
+- In LMU: `Settings → Gameplay → Enable external plugins` = on
+  (your `Settings.JSON` already has `true`).
+
+> **Note about the dummy:** `C:\soa1\local\lmu-spoof\fake\Le Mans Ultimate.exe` holds the
+> process name, port 6397 and `LMU_Data`. Close the spoof/GUI before starting the real LMU,
+> otherwise the game will not start or there will be a memory/port conflict.
+
+---
+
+## 3. Quick start: live qualifying
 
 ```powershell
 cd C:\soa1\local\LMU-LoadTelemetry
 
-# 1. diagnostyka: czy widać wszystkich i czy inputy się zmieniają?
+# 1. diagnostics: are all cars visible and do their inputs change?
 python record.py --probe-seconds 10
 
-# 2. nagrywanie całej sesji (Ctrl+C kończy)
+# 2. record the whole session (Ctrl+C stops)
 python record.py --out records --hz 30
 
-# 3. po sesji — analiza
+# 3. after the session: analysis
 python analyze.py records/*.csv.gz --out analysis --top 6
 
-# 4. otwórz raport
+# 4. open the report
 start analysis\report.html
 ```
 
-W trybie `--probe-seconds` zobaczysz tabelę:
+In `--probe-seconds` mode you will see a table:
 
 ```
-id   ctrl  kierowca          gaz min/max   ham min/max   okr   best
+id   ctrl  driver            thr min/max   brk min/max   laps  best
  5      2  Jan Kowalski      0.00/1.00     0.00/0.97      12   1:34.512
 ```
 
-- `ctrl`: 0 = gracz, 1 = AI, 2 = remote (online), 3 = replay.
-- Kolumna `gaz min/max` / `ham min/max` pokazuje, czy wartości się zmieniają.
-  Jeśli wszyscy oprócz jednego auta mają `0.00/0.00`, to w tej sesji tablica
-  zawiera tylko auto obserwowane — patrz sekcja 5.
+- `ctrl`: 0 = player, 1 = AI, 2 = remote (online), 3 = replay.
+- The `thr min/max` / `brk min/max` columns show whether the values change.
+  If everyone except one car has `0.00/0.00`, the array only contains the spectated car in
+  this session; see section 5.
 
 ---
 
-## 4. Replay (bez jazdy) — jak najdokładniej
+## 4. Replay (without driving): the most accurate way
 
-Plików `.Vcr` nie da się czytać bezpośrednio (format binarny, nieudokumentowany),
-więc replay **odtwarza się w grze, a aplikacja go nagrywa** jak żywą sesję:
+`.Vcr` files cannot be read directly (binary, undocumented format), so the replay is
+**played back in the game while the app records it** like a live session:
 
-1. W aplikacji ustaw **Hz: 100** (pasek nagrywania).
-2. W LMU: **Replay** → wybierz sesję (np. kwalifikacje).
-3. Przewiń na **początek** sesji, kliknij **● Nagrywaj** (F9) i puść replay w **1×**.
-4. **Nie przewijaj w trakcie** (cofanie miesza okrążenia) i nie używaj przyspieszenia.
-   Wystarczy, że przejedzie najszybsze okrążenie interesujących Cię kierowców.
-5. **Stop** — przy włączonym „po stopie analizuj i pokaż” wynik od razu pojawi się po prawej.
+1. In the app set **Hz: 100** (recording bar).
+2. In LMU: **Replay** → choose the session (e.g. qualifying).
+3. Rewind to the **start** of the session, click **● Record** (F9) and play the
+   replay at **1×**.
+4. **Do not seek during playback** (rewinding mixes up laps) and do not use fast-forward.
+   It is enough to play through the fastest lap of the drivers you are interested in.
+5. **Stop**: with **analyze and show after stop** enabled, the result appears on the right
+   immediately.
 
-Kolumna **Dane** w Wynikach pokazuje, ile próbek/s faktycznie ma okrążenie każdego
-kierowcy — tak sprawdzisz, czy replay daje rywali dokładniej niż online (~5 Hz).
-Czy LMU w replayu odświeża wszystkie auta częściej niż 5 Hz, nie było jeszcze sprawdzane.
+The **Data** column in **Results** shows how many samples/s each driver's lap actually
+has, so you can check whether the replay gives rivals more accurately than online (~5 Hz).
+Whether LMU refreshes all cars faster than 5 Hz during a replay has not been checked yet.
 
-> Do 31.10.2026 rejestrator zapisywał klatkę tylko przy zmianie czasu scoringu (~5 Hz),
-> więc nawet własne auto miało 5 próbek/s. Teraz zapisuje każdą nową klatkę telemetrii
-> (własne auto do 100 Hz). Starsze nagrania mają 5 Hz dla wszystkich.
+> Until 31.10.2026 the recorder only stored a frame when the scoring time changed (~5 Hz),
+> so even your own car had 5 samples/s. It now stores every new telemetry frame (your own car
+> up to 100 Hz). Older recordings have 5 Hz for everyone.
 
-## 5. Gdy inputy rywali są zerowe
+## 5. When rivals' inputs are zero
 
-Kolejność działań:
+What to do, in order:
 
-1. Sprawdź `--probe-seconds` w sesji online — czy `ctrl=2` ma zmienne `gaz/ham`.
-2. Jeśli nie, użyj **replaya** kwalifikacji (tam gra odtwarza wszystkie auta lokalnie).
-3. Jeśli replay też pokazuje tylko obserwowane auto:
-   - nagrywaj po jednym kierowcy, przełączając kamerę (środkowy przycisk myszy
-     w replayu pokazuje HUD inputów),
-   - albo użyj wbudowanego HUD replaya do ręcznego odczytu (bez eksportu).
-4. Wbudowana telemetria LMU (`.duckdb` w `UserData/Telemetry`) — według narzędzi
-   czytających te pliki zawiera metadane jednego `DriverName`, czyli raczej tylko
-   własne auto; nie nadaje się do rywali.
+1. Run `--probe-seconds` in an online session: does `ctrl=2` have changing throttle/brake?
+2. If not, use the **replay** of qualifying (the game plays back all cars locally there).
+3. If the replay also only shows the spectated car:
+   - record one driver at a time by switching the camera (the middle mouse button in the
+     replay shows the input HUD),
+   - or use the built-in replay HUD to read values manually (no export).
+4. LMU's built-in telemetry (`.duckdb` in `UserData/Telemetry`): according to tools that read
+   these files, the metadata holds a single `DriverName`, so it most likely only contains
+   your own car; it is not suitable for rivals.
 
 ---
 
-## 6. Co produkuje analiza
+## 6. What the analysis produces
 
-Po `python analyze.py records/plik.csv.gz --out analysis`:
+After `python analyze.py records/file.csv.gz --out analysis`:
 
-| Plik | Zawartość |
+| File | Contents |
 |---|---|
-| `analysis/report.html` | interaktywny raport: hamulec/gaz/prędkość, mapa toru, strefy hamowania, tabele |
-| `analysis/best_laps.csv` | najlepsze okrążenie każdego kierowcy, strata, pokrycie |
-| `analysis/braking.csv` | strefy hamowania: początek, koniec, moment gazu, Vmin, max hamulec, delty |
-| `analysis/traces.csv` | przeskalowane przebiegi co `--grid` metrów (Excel / MoTeC / własne skrypty) |
-| `analysis/summary.json` | podsumowanie maszynowe (kierowcy, strefy, delty) |
+| `analysis/report.html` | interactive report: brake/throttle/speed, track map, braking zones, tables |
+| `analysis/best_laps.csv` | each driver's best lap, gap, coverage |
+| `analysis/braking.csv` | braking zones: start, end, throttle pickup, Vmin, max brake, deltas |
+| `analysis/traces.csv` | traces resampled every `--grid` metres (Excel / MoTeC / your own scripts) |
+| `analysis/summary.json` | machine-readable summary (drivers, zones, deltas) |
 
-Raport:
+The report:
 
-- **Hamulec / Gaz / Prędkość** — przebiegi po dystansie; kolor = kierowca.
-- **Mapa toru** — linia referencji pokolorowana siłą hamowania, markery `H1…Hn`.
-- **Strefy hamowania** — tabela: gdzie hamuje każdy kierowca i o ile metrów
-  wcześniej/później niż referencja; `Δ` hamowania ujemna = hamuje **wcześniej** (mniejszy dystans),
-dodatnia = później; `Δ` gazu ujemna = wcześniej wciska gaz. Przy danych rywali ~5 Hz
-(0,2 s) delty mniejsze niż ~10–15 m traktuj jako przybliżone.
-- **Najlepsze okrążenia** — czasy i średnie delty.
-- **Tabela danych** — wartości co 100 m (widok tabelaryczny wykresów).
-- Tryb jasny/ciemny, tooltipy, legenda z filtrowaniem kierowców.
+- **Brake / Throttle / Speed**: traces by distance; colour = driver.
+- **Track map**: the reference line coloured by braking force, `B1…Bn` markers.
+- **Braking zones**: a table of where each driver brakes and how many metres earlier/later
+  than the reference. Negative braking `Δ` = brakes **earlier** (shorter distance), positive =
+  later; negative throttle `Δ` = gets on the throttle earlier. With rival data at ~5 Hz
+  (0.2 s), treat deltas smaller than ~10–15 m as approximate.
+- **Best laps**: times and average deltas.
+- **Data table**: values every 100 m (a tabular view of the charts).
+- Light/dark mode, tooltips, a legend with driver filtering.
 
-Czas okrążenia: jeśli w danych jest `mBestLapTime`, analiza używa dokładnego czasu
-z gry; w przeciwnym razie różnicy `lap_start_et` (z dokładnością do próbki).
-Jeśli `lap_start_et` jest zerowe (częste dla zdalnych aut), analiza wykrywa
-okrążenia po `mLapNumber` i zawinięciu `lap_dist`.
+Lap time: if `mBestLapTime` is present in the data, the analysis uses the exact time from the
+game; otherwise the `lap_start_et` difference (accurate to one sample).
+If `lap_start_et` is zero (common for remote cars), the analysis detects laps from
+`mLapNumber` and the `lap_dist` wrap-around.
 
 ---
 
-## 7. Pliki w projekcie
+## 7. Files in the project
 
-| Plik | Rola |
+| File | Role |
 |---|---|
-| `lmu_shm.py` | mapowanie struktur LMU + czytnik `LMU_Data` (offline dump i live) |
-| `record.py` | logger wszystkich aut do `records/*.csv.gz`; tryb `--probe-seconds` |
-| `analyze.py` | wykrywanie okrążeń, stref hamowania, delty, CSV + HTML |
-| `report_template.html` | szablon raportu (bez zewnętrznych bibliotek/CDN) |
-| `make_demo.py` | syntetyczna sesja do testów bez gry |
-| `lmu_app.py` | aplikacja desktopowa (nagrywanie, biblioteka sesji, podgląd wyników, brief AI) |
-| `lmu_theme.py` | wygląd w stylu iOS (zaokrąglone karty, kapsuły, przełączniki) |
-| `lmu_gamerec.py` | import nagrań wbudowanej telemetrii LMU (DuckDB) z setupem |
-| `lmu_coach.py` | plan treningu: diagnoza strat w zakrętach i wskazówki |
-| `lmu_engineer.py` | inżynier wyścigowy na żywo: komunikaty po okrążeniu, głos Windows (VR) |
-| `lmu_fuel.py` | zużycie paliwa / energii na okrążenie, stinty, kalkulator tankowania |
-| `lmu_handling.py` | analiza prowadzenia: zakręty z krzywizny, balans z poślizgu opon, transfer masy, opony, prześwit |
-| `lmu_setup.py` | setupy LMU: odnalezienie folderu gry, parser `.svm`, rozpoznanie nazwy, porównanie |
-| `lmu_results.py` | pliki wyników LMU (XML): okrążenia i sektory wszystkich kierowców, model auta |
-| `lmu_classes.py` | najlepsze czasy per klasa / auto z nagrań (cache w `analysis/_best`) |
-| `lmu_view.py` | wykresy i mapa toru w aplikacji (tkinter Canvas) |
-| `ai_coach.py` | generator briefu dla AI (`ai_brief.md`) |
-| `track_analysis.py` | analiza po torze: 3 najlepsze okrążenia + filtr szybszych/sektorów |
-| `to_tinypedal.py` | eksport najlepszych okrążeń do TinyPedal (`.tplap`) |
-| `START_LMU_TELEMETRY.cmd` | dwuklik uruchamia aplikację |
-| `records_demo/`, `analysis_demo/` | przykład/demo (dane **syntetyczne**) |
+| `lmu_shm.py` | LMU structure mapping + `LMU_Data` reader (offline dump and live) |
+| `record.py` | logs all cars to `records/*.csv.gz`; `--probe-seconds` mode |
+| `analyze.py` | lap detection, braking zones, deltas, CSV + HTML |
+| `report_template.html` | report template (no external libraries/CDN) |
+| `make_demo.py` | synthetic session for testing without the game |
+| `lmu_app.py` | desktop app (recording, session library, results viewer, AI brief) |
+| `lmu_theme.py` | iOS-style look (rounded cards, capsule buttons, switches) |
+| `lmu_gamerec.py` | import of LMU built-in telemetry recordings (DuckDB) with setup |
+| `lmu_coach.py` | training plan: diagnosis of corner losses and tips |
+| `lmu_engineer.py` | live race engineer: per-lap messages, Windows voice (VR) |
+| `lmu_fuel.py` | fuel / energy use per lap, stints, fuel calculator |
+| `lmu_handling.py` | handling analysis: corners from curvature, balance from tyre slip, load transfer, tyres, ride height |
+| `lmu_setup.py` | LMU setups: finding the game folder, `.svm` parser, name recognition, comparison |
+| `lmu_results.py` | LMU result files (XML): laps and sectors of all drivers, car model |
+| `lmu_classes.py` | best times per class / car from recordings (cached in `analysis/_best`) |
+| `lmu_view.py` | charts and track map in the app (tkinter Canvas) |
+| `ai_coach.py` | AI brief generator (`ai_brief.md`) |
+| `track_analysis.py` | per-track analysis: 3 best laps + faster/sector filter |
+| `to_tinypedal.py` | export of best laps to TinyPedal (`.tplap`) |
+| `START_LMU_TELEMETRY.cmd` | double-click to start the app |
+| `records_demo/`, `analysis_demo/` | example/demo (**synthetic** data) |
+| `docs/` | screenshots and the GitHub Pages landing page |
 
 ---
 
-## 8. Szczegóły techniczne (dla przyszłych aktualizacji LMU)
+## 8. Technical details (for future LMU updates)
 
-LMU ma własny interfejs pamięci współdzielonej, opisany w:
+LMU has its own shared memory interface, described in:
 
 ```
 <LMU>/Support/SharedMemoryInterface/SharedMemoryInterface.hpp
 <LMU>/Support/SharedMemoryInterface/InternalsPlugin.hpp
 ```
 
-Kluczowa struktura:
+The key structure:
 
 ```cpp
 struct SharedMemoryTelemetryData {
     uint8_t activeVehicles;
     uint8_t playerVehicleIdx;
     bool playerHasVehicle;
-    TelemInfoV01 telemInfo[104];   // wszystkie aktywne auta
+    TelemInfoV01 telemInfo[104];   // all active cars
 };
 ```
 
-Zweryfikowane empirycznie dla **LMU 1.4200** (zrzut z 44 autami):
+Verified empirically for **LMU 1.4200** (dump with 44 cars):
 
-- `SharedMemoryObjectOut` = 324 820 B (mapowanie gry ma 327 680 B).
-- `ScoringInfoV01` = 552 B; `vehScoringInfo` startuje pod `scoring + 560`,
-  krok 584 B.
-- `telemInfo` startuje pod `telemetry + 4`, krok 1888 B.
-- `mID` w `TelemInfoV01` i `VehicleScoringInfoV01` to 4 B (mimo `long` w nagłówku).
-- Pola wejściowe: `mUnfilteredThrottle`, `mUnfilteredBrake`, `mUnfilteredSteering`,
+- `SharedMemoryObjectOut` = 324,820 B (the game's mapping is 327,680 B).
+- `ScoringInfoV01` = 552 B; `vehScoringInfo` starts at `scoring + 560`, stride 584 B.
+- `telemInfo` starts at `telemetry + 4`, stride 1888 B.
+- `mID` in `TelemInfoV01` and `VehicleScoringInfoV01` is 4 B (despite `long` in the header).
+- Input fields: `mUnfilteredThrottle`, `mUnfilteredBrake`, `mUnfilteredSteering`,
   `mGear`, `mEngineRPM`, `mLocalVel`, `mPos`, `mLapNumber`, `mLapStartET`,
   `mElapsedTime`; scoring: `mLapDist`, `mPathLateral`, `mTrackEdge`, `mBestLapTime`,
   `mLastLapTime`, `mDriverName`, `mControl`.
-- Eventy `LMU_Data_HoldEvent` / `LMU_Data_DataEvent`; czytnik czeka na nową klatkę
-  i wykonuje podwójny odczyt (spójność), bo `Interlocked*` są intrinsics i nie są
-  eksportowane z `kernel32` na Win64.
-- `Plugin Mask` = 4 w `Settings.JSON` (domyślnie 100 Hz). Logger domyślnie próbkuje
-  30 Hz i pomija powtórzone klatki w pauzie.
+- Events `LMU_Data_HoldEvent` / `LMU_Data_DataEvent`; the reader waits for a new frame and
+  reads twice (consistency check), because `Interlocked*` are intrinsics and are not exported
+  from `kernel32` on Win64.
+- `Plugin Mask` = 4 in `Settings.JSON` (100 Hz by default). The logger samples at 30 Hz by
+  default and skips repeated frames while paused.
 
-Jeśli LMU po aktualizacji zmieni układ struktur, zweryfikuj offsety na nowym
-zrzucie `LMU_Data` (np. `python lmu_shm.py plik.bin`).
+If an LMU update changes the structure layout, verify the offsets on a fresh `LMU_Data` dump
+(e.g. `python lmu_shm.py file.bin`).
 
 ---
 
-## 9. Rozwiązywanie problemów
+## 9. Troubleshooting
 
-| Objaw | Przyczyna / rozwiązanie |
+| Symptom | Cause / fix |
 |---|---|
-| `Nie moge otworzyc 'LMU_Data'` | LMU nie działa albo `Enable external plugins` jest wyłączone |
-| `active=0` | menu/monitor/garage — wejdź na tor lub odtwórz replay |
-| Wszystkie `gaz/ham` = 0 | sesja w menu; albo wersja eksponuje tylko obserwowane auto (sekcja 5) |
-| Gra nie startuje | działa `lmu-spoof` (fałszywy proces, port 6397, `LMU_Data`) — zamknij go |
-| `EAC Failed to get anti cheat handle` w `trace.txt` | ostrzeżenie EAC; ostatnia sesja i tak zakończyła się czysto |
-| Pliki za duże | `--hz 20`, `--driver "nazwa"`, krótsze sesje |
-| Brak stref hamowania | zbyt łagodne/rzadkie dane; spróbuj `--grid 1` i dłuższego nagrania |
-| Krzaki w nazwach (`S�bastien`) | plik CSV jest UTF-8; otwieraj w edytorze/Excelu z UTF-8, nie CP1252 |
+| `Cannot open 'LMU_Data'` | LMU is not running or `Enable external plugins` is off |
+| `active=0` | menu/monitor/garage: get on track or play a replay |
+| All throttle/brake = 0 | session is in the menu; or this version only exposes the spectated car (section 5) |
+| The game does not start | `lmu-spoof` is running (fake process, port 6397, `LMU_Data`): close it |
+| `EAC Failed to get anti cheat handle` in `trace.txt` | an EAC warning; the last session still ended cleanly |
+| Files too large | `--hz 20`, `--driver "name"`, shorter sessions |
+| No braking zones | data too smooth/sparse; try `--grid 1` and a longer recording |
+| Garbled names (`S�bastien`) | the CSV is UTF-8; open it in an editor/Excel as UTF-8, not CP1252 |
 
 ---
 
-## 10. Analiza przez AI
+## 10. AI analysis
 
-`python ai_coach.py analysis/<sesja> --driver "Marek"` (lub `analysis/track_<tor>`) tworzy `ai_brief.md`:
-tabele czasów, strefy hamowania, delty i gotowy prompt dla AI.
+`python ai_coach.py analysis/<session> --driver "Marek"` (or `analysis/track_<track>`) creates
+`ai_brief.md`: lap time tables, braking zones, deltas and a ready-made prompt for an AI.
 
-- AI dostaje **policzone liczby**, nie surowe 2 mln próbek — dzięki temu wnioski
-  są oparte na danych, a nie zgadywane.
-- Prompt wymaga wskazania konkretnych zakrętów/dystansów i oddzielenia pewnych
-  wniosków od niepewnych (dane rywali ~5 Hz).
-- Aplikacja ma przycisk **Brief AI** z kopiowaniem do schowka.
-- Opcjonalne wysłanie do Claude API można dodać, jeśli masz `ANTHROPIC_API_KEY`;
-  domyślnie wszystko zostaje lokalnie.
+- The AI gets **computed numbers**, not 2 million raw samples, so its conclusions are based on
+  data instead of guesses.
+- The prompt asks for specific corners/distances and for separating certain conclusions from
+  uncertain ones (rival data is ~5 Hz).
+- The app has an **AI brief** tab with copy to clipboard.
+- Optionally sending it to the Claude API could be added if you have `ANTHROPIC_API_KEY`;
+  by default everything stays local.
 
-## 10a. Eksport do TinyPedal (referencja w delcie i widgecie)
+## 10a. Export to TinyPedal (reference for the delta and widget)
 
-`to_tinypedal.py` zamienia najlepsze okrążenie z nagrania na plik TinyPedal
-Best Lap (`.tplap`): tor, klasa, czas, kierowca, auto, delta (czas vs dystans)
-i telemetria co 5 m (gaz, hamulec, prędkość, kierownica, bieg).
+`to_tinypedal.py` turns the best lap from a recording into a TinyPedal Best Lap file
+(`.tplap`): track, class, time, driver, car, delta (time vs distance) and telemetry every 5 m
+(throttle, brake, speed, steering, gear).
 
 ```
-python to_tinypedal.py records/plik.csv.gz                       # Twoje najlepsze okrążenie
-python to_tinypedal.py records/plik.csv.gz --driver "Bacon"      # okrążenie rywala
-python to_tinypedal.py records/plik.csv.gz --class LMP2_ELMS --top 3
+python to_tinypedal.py records/file.csv.gz                       # your best lap
+python to_tinypedal.py records/file.csv.gz --driver "Bacon"      # a rival's lap
+python to_tinypedal.py records/file.csv.gz --class LMP2_ELMS --top 3
 ```
 
-Pliki trafiają do `tinypedal_laps/`. W TinyPedal: **Tools → Best Lap Manager →
-Import**. Wczytane okrążenie staje się referencją dla delty i widgetu
-**Best lap telemetry** (gaz/hamulec/prędkość) dla tego toru i klasy.
-Twój własny rekord jest zawsze zachowany (`deltabest\personal_best`) i dalej
-aktualizowany, gdy go poprawisz; wraca przyciskiem **Restore Own**. Jeśli
-pobijesz wczytane okrążenie, Twoje automatycznie staje się referencją.
+Files go to `tinypedal_laps/`. In TinyPedal: **Tools → Best Lap Manager → Import**. The loaded
+lap becomes the reference for the delta and for the **Best lap telemetry** widget
+(throttle/brake/speed) for that track and class. Your own record is always kept
+(`deltabest\personal_best`) and still updated when you improve it; **Restore Own** brings it
+back. If you beat the loaded lap, yours automatically becomes the reference.
 
-Uwagi:
-- Rywale są próbkowani ~5 Hz (co ~10–15 m), więc punkty hamowania są
-  przybliżone (interpolacja liniowa); Twoje auto zależy od `--hz` nagrywania.
-- Klasa musi się zgadzać z tą w grze (`mVehicleClass`), inaczej TinyPedal
-  nie dopasuje okrążenia do toru i klasy.
-- Wymaga TinyPedal z gałęzią `feature/best-lap-telemetry` (Best Lap Manager).
+Notes:
+- Rivals are sampled at ~5 Hz (every ~10–15 m), so braking points are approximate (linear
+  interpolation); your own car depends on the recording `--hz`.
+- The class must match the in-game one (`mVehicleClass`), otherwise TinyPedal will not match
+  the lap to the track and class.
+- Requires TinyPedal with the `feature/best-lap-telemetry` branch (Best Lap Manager).
 
-## 11. Fair play / bezpieczeństwo
+## 11. Fair play / safety
 
-- Narzędzie **tylko czyta** oficjalną pamięć współdzieloną LMU. Nie wstrzykuje kodu,
-  nie modyfikuje gry, nie obchodzi EAC.
-- Dane rywali są widoczne w replayu/HUD samej gry; używaj ich do analizy **po sesji**,
-  a nie jako live-coach w trakcie wyścigu — regulaminy online mogą tego zabraniać.
-- Nie publikuj cudzych nazwisk/SteamID bez potrzeby.
+- The tool **only reads** LMU's official shared memory. It does not inject code, modify the
+  game or bypass EAC.
+- Rival data is visible in the game's own replay/HUD; use it for analysis **after the
+  session**, not as a live coach during a race, because online rules may forbid that.
+- Don't publish other people's names/SteamIDs without a reason.
 
 ---
 
-## 12. Demo bez gry
+## 12. Demo without the game
 
 ```powershell
 python make_demo.py --out records_demo
@@ -428,5 +459,13 @@ python analyze.py records_demo/*.csv.gz --out analysis_demo
 start analysis_demo\report.html
 ```
 
-Demo jest **syntetyczne** — raport ma żółty banner „DANE SYNTETYCZNE”.
-Służy do sprawdzenia wykresów, tabel i delty bez uruchamiania LMU.
+The demo is **synthetic**: the report has a yellow "SYNTHETIC DATA" banner.
+It is there to check the charts, tables and delta without running LMU. To browse it in the
+app, copy `records_demo/*` into `records/` and click **Analyze**.
+
+---
+
+## Support
+
+LMU LoadTelemetry is a free hobby project. If it saves you time or tenths of a second, you
+can support it on **[Buy Me a Coffee](https://buymeacoffee.com/soa1marekd)**. Thank you!
