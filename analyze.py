@@ -391,7 +391,8 @@ def collect_traces(paths, targets, key_filter, edges=None):
 
 def resample(samples, track_len, step):
     """Probki -> siatka po dystansie. Zwraca dict z listami (None = brak)."""
-    ss = [s for s in samples if 0 <= s[0] <= track_len * 1.08]
+    rate = input_rate(samples) if samples and len(samples[0]) > 8 else None
+    ss = [s for s in _fill_dist(samples, track_len) if 0 <= s[0] <= track_len * 1.08]
     ss.sort(key=lambda s: s[0])
     # deduplikacja dystansu
     clean = []
@@ -433,7 +434,141 @@ def resample(samples, track_len, step):
     return {
         "grid": grid, "throttle": thr, "brake": brk, "steering": ste,
         "gear": gear, "speed": spd, "x": xs, "z": zs, "lat": lat, "coverage": cov,
+        "input_rate": rate,
     }
+
+
+def _fill_dist(samples, track_len):
+    """lap_dist ze scoringu zmienia sie ~5x/s, telemetria do 100 Hz: miedzy odczytami
+    dystansu doliczamy przejechane metry z predkosci (inaczej deduplikacja zostawia ~5 probek/s,
+    kazda z dystansem sprzed do 0.2 s)."""
+    if not samples or len(samples[0]) <= 8:
+        return list(samples)
+    ss = sorted(samples, key=lambda s: s[8])
+    t0 = ss[0][8]
+    out = []
+    last = base = prev_t = prev_v = None
+    acc = 0.0
+    for s in ss:
+        d, v, et = s[0], s[5], s[8]
+        # tuz po linii scoring podaje jeszcze dystans z konca poprzedniego okrazenia
+        if et - t0 < 3.0 and track_len and d > 0.5 * track_len:
+            continue
+        if last is None or d != last:
+            last = base = d
+            acc = 0.0
+        else:
+            acc += 0.5 * (prev_v + v) * max(0.0, et - prev_t)
+        prev_t, prev_v = et, v
+        out.append(s if acc == 0.0 else (base + acc,) + tuple(s[1:]))
+    return out
+
+
+# ------------------------------------------------------------------ wejscia rywali online
+# Gaz/hamulec/bieg innych aut gra dostaje z sieci rzadko (~0.5 zmiany/s) i z opoznieniem
+# 0.1-1.5 s, a pozycja/predkosc przychodza ~35x/s. Takie wejscia odtwarzamy z predkosci:
+# opoznienie ponad opor (aero + toczenie) = hamulec, przyspieszenie = gaz. Model kalibrujemy
+# na aucie z dokladnymi wejsciami (gracz) w tym samym nagraniu.
+SPARSE_RATE = 2.0   # zmian gazu/hamulca na sekunde ponizej = wejscia z sieci
+
+
+def input_rate(samples):
+    """Zmiany gazu lub hamulca na sekunde (probki: d, gaz, hamulec, ..., et na [8])."""
+    ss = sorted(samples, key=lambda s: s[8])
+    if len(ss) < 20:
+        return None
+    dur = ss[-1][8] - ss[0][8]
+    if dur <= 1:
+        return None
+    ch = sum(1 for a, b in zip(ss, ss[1:]) if a[1] != b[1] or a[2] != b[2])
+    return ch / dur
+
+
+def _accel(grid, v, w=3):
+    n = len(v)
+    a = [0.0] * n
+    for i in range(n):
+        i0, i1 = max(0, i - w), min(n - 1, i + w)
+        ds = grid[i1] - grid[i0]
+        if ds > 0:
+            a[i] = v[i] * (v[i1] - v[i0]) / ds
+    return a
+
+
+def _fit2(pts):
+    """y = c0 + c2*v^2 (najmniejsze kwadraty)."""
+    n = len(pts)
+    x = [v * v for v, _ in pts]
+    y = [yy for _, yy in pts]
+    mx, my = sum(x) / n, sum(y) / n
+    sxx = sum((xi - mx) ** 2 for xi in x)
+    c2 = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y)) / sxx if sxx else 0.0
+    return my - c2 * mx, max(c2, 0.0)
+
+
+def _estimate(grid, v, m):
+    (c0, c2), (b0, b2), power, tmax = m["coast"], m["brake"], m["power"], m["tmax"]
+    a = _accel(grid, v)
+    brk, thr = [], []
+    for vv, aa in zip(v, a):
+        coast = c0 + c2 * vv * vv
+        cap = max(b0 + b2 * vv * vv - coast, 3.0)
+        ex = -aa - coast
+        b = max(0.0, min(1.0, (ex - 1.5) / cap)) if ex > 2.5 else 0.0
+        full = max(min(tmax, power / max(vv, 1.0)), 1.0)
+        brk.append(b)
+        thr.append(0.0 if b > 0.05 else max(0.0, min(1.0, (aa + coast) / full)))
+    sh = m.get("shift", 0)
+    if sh > 0:   # staly poslizg estymacji (wygladzanie) zmierzony na aucie kalibracyjnym
+        brk = brk[sh:] + [brk[-1]] * sh
+        thr = thr[sh:] + [thr[-1]] * sh
+    return brk, thr
+
+
+def input_model(d):
+    """Model oporu / hamowania / mocy z okrazenia z dokladnymi wejsciami (predkosc w m/s)."""
+    g, v, th, br = d["grid"], d["speed"], d["throttle"], d["brake"]
+    a = _accel(g, v)
+    co = [(v[i], -a[i]) for i in range(len(v)) if br[i] < 0.02 and th[i] < 0.02 and v[i] > 20]
+    fb = [(v[i], -a[i]) for i in range(len(v)) if br[i] > 0.85 and v[i] > 20]
+    ft = [(v[i], a[i]) for i in range(len(v)) if th[i] > 0.98 and br[i] < 0.01 and v[i] > 15]
+    m = {"coast": _fit2(co) if len(co) > 30 else (1.0, 0.0010),
+         "brake": _fit2(fb) if len(fb) > 30 else (16.0, 0.0020)}
+    c0, c2 = m["coast"]
+    drive = sorted((aa + c0 + c2 * vv * vv) for vv, aa in ft)
+    m["power"] = statistics.median([(aa + c0 + c2 * vv * vv) * vv for vv, aa in ft]) if ft else 500.0
+    m["tmax"] = drive[int(0.95 * (len(drive) - 1))] if drive else 8.0
+    # przesuniecie: start hamowania z estymacji vs prawdziwy na tym samym okrazeniu
+    step = (g[1] - g[0]) if len(g) > 1 else 2.0
+    eb, et = _estimate(g, v, dict(m, shift=0))
+    zr = find_zones(g, br, th, v)
+    ze = find_zones(g, eb, et, v)
+    errs = []
+    for z in zr:
+        q = min(ze, key=lambda x: abs(x["start_d"] - z["start_d"]), default=None)
+        if q and abs(q["start_d"] - z["start_d"]) < 60:
+            errs.append(q["start_d"] - z["start_d"])
+    m["shift"] = max(0, int(round(statistics.median(errs) / step))) if len(errs) >= 3 else 4
+    return m
+
+
+def fix_remote_inputs(drivers, player=None):
+    """Kierowcy z rzadkimi wejsciami (online): gaz/hamulec odtworzone z predkosci."""
+    sparse = [d for d in drivers if d.get("input_rate") is not None
+              and d["input_rate"] < SPARSE_RATE]
+    if not sparse:
+        return 0
+    good = [d for d in drivers if d not in sparse]
+    ref = next((d for d in good if player and d["name"] == player), None)
+    if ref is None and good:
+        ref = max(good, key=lambda d: d.get("input_rate") or 0)
+    m = input_model(ref) if ref else {"coast": (1.0, 0.0010), "brake": (16.0, 0.0020),
+                                      "power": 500.0, "tmax": 8.0, "shift": 4}
+    for d in sparse:
+        d["brake"], d["throttle"] = _estimate(d["grid"], d["speed"], m)
+        d["inputs_estimated"] = True
+        d["zones"] = find_zones(d["grid"], d["brake"], d["throttle"], d["speed"])
+    return len(sparse)
 
 
 def find_zones(grid, brake, throttle, speed):
@@ -740,7 +875,11 @@ def main(argv=None):
             "z": r["z"],
             "lat": r["lat"],
             "zones": zones,
+            "input_rate": r.get("input_rate"),
         })
+    n_est = fix_remote_inputs(drivers, pl)
+    if n_est:
+        print(f"[ANALYSIS] online rivals with sparse inputs: {n_est} - throttle/brake rebuilt from speed")
     if not drivers:
         print("Could not build traces (no samples in the laps).")
         return 2
@@ -815,6 +954,7 @@ def main(argv=None):
             "name": d["name"], "vehicle": d["vehicle"], "lap": d["lap"],
             "lap_time_s": d["lap_time"], "gap_s": d["lap_time"] - drivers[0]["lap_time"],
             "position": d.get("position"),
+            "inputs_estimated": bool(d.get("inputs_estimated")),
             "coverage": d["coverage"], "zones": len(d["zones"]),
             "mean_brake_delta_m": next((x["mean_brake_delta_m"] for x in dsum
                                         if x["name"] == d["name"]), None),

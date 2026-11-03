@@ -191,8 +191,15 @@ qualifying: when they brake, when they get back on the throttle and where on tra
 - Whether the array contains all cars during **replay playback** (`mControl == 3`).
   LMU's replay HUD shows every car's inputs, so it is very likely, but I have not tested it
   live.
-- Rival accuracy: shared memory refreshes their data at ~5 Hz (0.2 s, ~10–15 m at high
-  speed). Treat deltas smaller than ~10–15 m as approximate.
+- Rival accuracy: position and speed of other cars arrive ~35x/s, but online their
+  **throttle, brake and gear come over the network only ~0.5x/s and 0.1–1.5 s late** (step-like
+  traces, braking shown 30–50 m too late at Le Mans). When a driver's inputs change less than
+  2x/s, the analysis rebuilds throttle/brake from speed: deceleration above drag = braking,
+  acceleration = throttle, calibrated on your own car in the same recording (on your lap the
+  rebuilt braking point lands within ±2 m of the real one). These traces are drawn **dashed**.
+  Rivals close to you are sent more often and keep their real inputs.
+- `lap_dist` comes from scoring (~5x/s); between updates the distance is advanced from speed,
+  so high-rate telemetry is not collapsed to 5 samples/s.
 - If online/replay only exposes the spectated car, you have to record one car at a time by
   switching the camera (see section 5).
 

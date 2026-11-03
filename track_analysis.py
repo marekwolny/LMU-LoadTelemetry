@@ -365,9 +365,11 @@ def build(selected_names, best_by_driver, files, track, track_len, player, outdi
             "s1": lap.get("s1"), "s2": lap.get("s2"), "s3": lap.get("s3"),
             "grid": r["grid"], "throttle": r["throttle"], "brake": r["brake"],
             "speed": r["speed"], "gear": r["gear"], "x": r["x"], "z": r["z"],
-            "lat": r["lat"], "zones": zones,
+            "lat": r["lat"], "zones": zones, "input_rate": r.get("input_rate"),
         })
         used.add(name)
+    # rywale online: gaz/hamulec z sieci sa rzadkie i opoznione -> odtworzone z predkosci
+    analyze.fix_remote_inputs(drivers, player)
     drivers.sort(key=lambda d: d["lap_time"])
     if not drivers:
         raise RuntimeError("Could not build traces for any driver.")

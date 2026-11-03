@@ -60,6 +60,8 @@ class Analysis:
         drivers = self.summary.get("drivers") or []
         self.drivers = [d["name"] for d in drivers]
         self.lap_time = {d["name"]: d.get("lap_time_s") for d in drivers}
+        # rywale online: gaz/hamulec odtworzone z predkosci (dane z sieci rzadkie i opoznione)
+        self.estimated = {d["name"] for d in drivers if d.get("inputs_estimated")}
         self.reference = self.summary.get("reference") or (self.drivers[0] if self.drivers else None)
         self.track_len = float(self.summary.get("track_length_m") or 0)
         self.braking = sorted(self.summary.get("braking") or [],
@@ -632,7 +634,9 @@ class ChartView(tk.Frame):
                     pts.append(self._y(p, vals[i]))
                 if len(pts) >= 4:
                     width = 2.4 if n == self.focus else (1.9 if n == self.base else 1.3)
-                    cv.create_line(*pts, fill=self.a.colors[n], width=width)
+                    est = p["key"] in ("thr", "brk") and n in self.a.estimated
+                    cv.create_line(*pts, fill=self.a.colors[n], width=width,
+                                   dash=(6, 3) if est else ())
             # maska poza panelem (przy zoomie)
             cv.create_rectangle(0, p["t"] - 1, p["l"] - 1, p["b"] + 1, fill=C_CARD, outline="")
             cv.create_rectangle(p["r"] + 1, p["t"] - 1, w, p["b"] + 1, fill=C_CARD, outline="")
@@ -645,6 +649,8 @@ class ChartView(tk.Frame):
             title = p["title"]
             if p["kind"] == "delta" and self.base:
                 title += f"  vs {short(self.base, 20)}   (up = slower, down = faster)"
+            if p["key"] in ("thr", "brk") and any(n in self.a.estimated for n in self.selected):
+                title += "   ·  dashed = rebuilt from speed (online rival inputs are delayed)"
             cv.create_text(p["l"] + 6, p["b"] - 3, anchor="sw", text=title, fill=C_MUTED,
                            font=(FONT, 8, "bold"))
         zoomed = self.x0 > 0.5 or self.x1 < self.a.track_len - 0.5
