@@ -761,6 +761,7 @@ class LmuApp:
                                 fg="#ff453a" if s["left"] < 1.6 else "#ffffff")
         need = s.get("need")
         if need is not None and s.get("session") == "race":
+            need *= s.get("ve_scale", 1.0) if s.get("use_ve") else 1.0
             L["finish"].configure(
                 text=(f"Do mety (~{s['remain']} okr.): brakuje {need:.1f} — oszczędzaj "
                       f"{need / s['remain']:.2f}/okr." if need > 0 else
@@ -1045,6 +1046,10 @@ class LmuApp:
             return
         src, folder = base
         folder = folder or lmu_setup.track_folder(info["track"])
+        if not folder:
+            self.fu_write.configure(text="Nie znalazłem folderu setupów LMU (UserData/player/Settings).",
+                                    foreground=C_ERR)
+            return
         text = Path(src).read_text(encoding="utf-8", errors="ignore")
         new, desc = lmu_setup.with_fuel(text, liters=total, ve_pct=getattr(self, "_fu_total_ve", None))
         if new is None:
@@ -2966,6 +2971,9 @@ class LmuApp:
                     self._rec_done(item[1])
         except queue.Empty:
             pass
+        except Exception:
+            # blad w obsludze jednego zdarzenia nie moze zatrzymac petli (koniec logu, nagrywania)
+            self.log("BŁĄD: " + traceback.format_exc().strip().splitlines()[-1])
         self.root.after(120, self._poll_queue)
 
     def on_close(self):

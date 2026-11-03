@@ -622,6 +622,8 @@ def main(argv=None) -> int:
                 meta = build_meta(sm, wall)
                 writer = SessionWriter(args.out, track, session_id, meta)
                 cur_key = key
+                # nowa sesja: bez tego pierwsze [LAP] liczy okrazenie i paliwo z poprzedniej sesji
+                lap_watch = LapWatch()
                 setup_watch.poll(writer, float(sc.mCurrentET), now, force=True)
             # scoring (mCurrentET) odswieza sie tylko ~5 Hz, telemetria do 100 Hz -
             # klatka jest nowa, jesli zmienil sie czas scoringu ALBO telemetrii

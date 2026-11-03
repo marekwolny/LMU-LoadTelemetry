@@ -834,7 +834,7 @@ def main(argv=None):
             }
             tpl = open(tpl_path, encoding="utf-8").read()
             page = tpl.replace("__DATA_JSON__",
-                               json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\/"))
+                               json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/"))
             page = page.replace("__PAGE_TITLE__",
                                 html_lib.escape(f"LMU telemetria — {track} / {sess_label}"))
             out_html = os.path.join(args.out, "report.html")

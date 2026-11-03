@@ -275,7 +275,7 @@ def pending(records: Path, registry: Path) -> list[Path]:
         r = reg.get(p.name)
         if (r and r.get("covered")) or covered_by(p, records):
             continue
-        if r and r.get("size") == st.st_size and (records / f"{r['stem']}.csv.gz").exists():
+        if r and r.get("stem") and r.get("size") == st.st_size and (records / f"{r['stem']}.csv.gz").exists():
             continue
         if r and r.get("skip") and r.get("size") == st.st_size:
             continue
@@ -318,14 +318,19 @@ class Source:
     def __init__(self, path: Path):
         import duckdb
         self.con = duckdb.connect(str(path), read_only=True)
-        self.tables = {t[0] for t in self.con.execute("SHOW TABLES").fetchall()}
-        self.meta = {}
-        if "metadata" in self.tables:
-            self.meta = {k: v for k, v in self.con.execute("SELECT key, value FROM metadata").fetchall()}
-        g = self.con.execute('SELECT value FROM "GPS Time" ORDER BY rowid').fetchall()
-        self.gps = [r[0] for r in g if r[0] is not None]
-        if len(self.gps) < 10:
-            raise ValueError("pusty plik (brak GPS Time)")
+        try:
+            self.tables = {t[0] for t in self.con.execute("SHOW TABLES").fetchall()}
+            self.meta = {}
+            if "metadata" in self.tables:
+                self.meta = {k: v for k, v in self.con.execute("SELECT key, value FROM metadata").fetchall()}
+            g = self.con.execute('SELECT value FROM "GPS Time" ORDER BY rowid').fetchall()
+            self.gps = [r[0] for r in g if r[0] is not None]
+            if len(self.gps) < 10:
+                raise ValueError("pusty plik (brak GPS Time)")
+        except Exception:
+            # bez tego plik .duckdb zostaje otwarty (na Windows zablokowany dla gry)
+            self.con.close()
+            raise
 
     def close(self):
         self.con.close()

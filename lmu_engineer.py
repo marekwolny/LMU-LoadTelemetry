@@ -78,6 +78,7 @@ def _num(v, nd, lang):
 
 def _laptime(t, lang):
     """Czas okrazenia po 'wyscigowemu': 1 24 7 (minuta, sekundy, dziesiate)."""
+    t = round(t, 1)          # 1:59.97 -> "2 00 0", a nie "1 59 0"
     m = int(t // 60)
     sec = t - m * 60
     whole = int(sec)
@@ -97,6 +98,7 @@ class Engineer:
         self.ve_rates: list[float] = []
         self.state = {}
         self.session = None
+        self.ve_max = 0.0
 
     def feed(self, ev: dict, lang: str = "pl", fuel_on=True, time_on=True) -> str:
         if ev.get("session") != self.session:
@@ -116,6 +118,9 @@ class Engineer:
             self.ve_rates.append(veu)
         fuel, ve = ev.get("fuel") or 0, ev.get("ve") or 0
         use_ve = bool(self.ve_rates) and ve > 0
+        # pamiec wspoldzielona podaje energie jako ulamek 0..1 - w komunikatach procenty
+        self.ve_max = max(self.ve_max, ve)
+        ve_scale = 100.0 if use_ve and self.ve_max <= 1.0 + 1e-6 else 1.0
         rates = self.ve_rates if use_ve else self.fuel_rates
         recent = rates[-5:]
         per = statistics.fmean(recent) if recent else None
@@ -130,7 +135,7 @@ class Engineer:
                       "delta": delta, "pb": pb, "fuel": fuel, "ve": ve, "use_ve": use_ve,
                       "per": per, "left": left, "remain": remain, "need": need,
                       "place": ev.get("place"), "session": ev.get("session"),
-                      "invalid": ev.get("invalid")}
+                      "invalid": ev.get("invalid"), "ve_scale": ve_scale}
         return self.message(lang, fuel_on, time_on)
 
     def message(self, lang="pl", fuel_on=True, time_on=True) -> str:
@@ -158,10 +163,11 @@ class Engineer:
                            f"fuel for {_num(left, 1, lang)} laps")
             need = s.get("need")
             if need is not None and s.get("session") == "race":
-                amount = _num(abs(need), 0 if s["use_ve"] else 1, lang)
+                k = s.get("ve_scale", 1.0) if s["use_ve"] else 1.0
+                amount = _num(abs(need) * k, 0 if s["use_ve"] else 1, lang)
                 u = (" procent" if pl else " percent") if s["use_ve"] else (" litra" if pl else " litres")
                 if need > 0 and s.get("remain"):
-                    save = need / s["remain"]
+                    save = need / s["remain"] * k
                     out.append(f"do mety brakuje {amount}{u}, oszczędzaj "
                                f"{_num(save, 2 if not s['use_ve'] else 1, lang)} na okrążenie"
                                if pl else f"short {amount}{u} to the finish, save "

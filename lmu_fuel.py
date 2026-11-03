@@ -145,7 +145,8 @@ def rates(laps: list[dict], key="fuel") -> dict:
     if times:
         best = min(times)
         fly = [l for l in fly if not l.get("time") or l["time"] <= best * 1.07]
-    vals = [l[key] for l in fly if l[key] > 0.05]
+    # energia wirtualna jest ulamkiem 0..1 (3-8 % na okr. = 0.03-0.08) - prog 0.05 jest tylko dla litrow
+    vals = [l[key] for l in fly if l[key] > (0.05 if key == "fuel" else 0.0005)]
     out = [l[key] for l in laps if l["kind"] == "out" and l.get(key) and not l.get("race")]
     form = [l[key] for l in laps if l["kind"] == "out" and l.get(key) and l.get("race")]
     inn = [l[key] for l in laps if l["kind"] == "in" and l.get(key)]
